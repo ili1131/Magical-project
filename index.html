@@ -21,8 +21,11 @@
   .stats { display: flex; gap: 10px; flex-wrap: wrap; }
   .stat { flex: 1; min-width: 90px; background: #f0f4fa; border-radius: 10px; padding: 10px; text-align: center; }
   .stat b { display: block; font-size: 22px; }
-  #reader { width: 100%; max-width: 420px; margin: 10px auto 0; display: none; border-radius: 10px; overflow: hidden; }
-  #reader video { width: 100%; }
+  #reader { position: relative; width: 100%; max-width: 480px; margin: 10px auto 0; display: none; border-radius: 10px; overflow: hidden; background: #000; }
+  #reader video { width: 100%; display: block; background: #000; object-fit: cover; }
+  .scan-frame { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 82%; height: 40%; border: 2px solid rgba(255,80,80,.9); border-radius: 10px; box-shadow: 0 0 0 9999px rgba(0,0,0,.2); pointer-events: none; }
+  .scan-frame::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 2px; background: rgba(255,80,80,.85); animation: scanline 2s ease-in-out infinite; }
+  @keyframes scanline { 0%,100% { top: 8%; } 50% { top: 92%; } }
   .manual-row { display: flex; gap: 8px; margin-top: 10px; }
   .manual-row input { flex: 1; padding: 12px; border: 2px solid #0b5ed7; border-radius: 10px; font-size: 16px; }
   .log { max-height: 180px; overflow-y: auto; font-size: 13px; margin-top: 10px; border-top: 1px dashed #ddd; padding-top: 8px; }
@@ -36,7 +39,7 @@
   .table-wrap { max-height: 50vh; overflow: auto; border-radius: 8px; }
   .hint { color: #666; font-size: 13px; line-height: 1.6; }
   #fileName { font-size: 13px; color: #0b5ed7; margin-left: 6px; word-break: break-all; }
-  .toast { position: fixed; left: 50%; bottom: 60px; transform: translateX(-50%); background: rgba(0,0,0,.8); color: #fff; padding: 10px 20px; border-radius: 24px; font-size: 14px; display: none; z-index: 99; }
+  .toast { position: fixed; left: 50%; bottom: 60px; transform: translateX(-50%); background: rgba(0,0,0,.8); color: #fff; padding: 10px 20px; border-radius: 24px; font-size: 14px; display: none; z-index: 99; max-width: 80vw; text-align: center; }
   #loadStatus { position: fixed; inset: 0; background: rgba(255,255,255,.92); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; z-index: 100; font-size: 15px; color: #333; }
   .spinner { width: 36px; height: 36px; border: 4px solid #dbe4f0; border-top-color: #0b5ed7; border-radius: 50%; animation: spin 1s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
@@ -75,12 +78,15 @@
   </div>
 
   <div class="card" id="scanCard" style="display:none">
-    <button class="btn btn-success" id="btnCamera">② 开启相机扫码</button>
-    <button class="btn btn-danger" id="btnStop" style="display:none">停止扫码</button>
+    <button class="btn btn-success" id="btnCamera">② 开启摄像头实时扫描</button>
+    <button class="btn btn-danger" id="btnStop" style="display:none">停止扫描</button>
     <div id="reader"></div>
     <div class="manual-row">
       <input id="manualInput" placeholder="或手动输入 / 粘贴条码后回车" autocomplete="off">
       <button class="btn btn-secondary" id="btnManual">核对</button>
+    </div>
+    <div class="hint" style="margin-top:6px; color:#dc3545;">
+      ⚠️ 网页无法调起微信或系统相机App。请务必使用 <b>Chrome 或系统自带浏览器</b> 打开本页面，才能获得最高清的原生级扫码体验。
     </div>
     <div class="log" id="log"></div>
   </div>
@@ -162,12 +168,24 @@ loadAll(["XLSX","ExcelJS","Html5Qrcode"], function(ok, which){
 
 <script>
 let sheetName = "", headers = [], rows = [];
-let matchColIdx = -1, matchedSet = new Set(), fileBase = "核对结果";
+let matchColIdx = -1, matchedSet = new Set(), codeIndex = new Map();
+let fileBase = "核对结果";
 const $ = id => document.getElementById(id);
 
-function toast(msg){ const t=$("toast"); t.textContent=msg; t.style.display="block"; clearTimeout(t._tm); t._tm=setTimeout(()=>t.style.display="none",1600); }
-function logMsg(cls,msg){ const d=document.createElement("div"); d.className=cls; d.textContent=msg; $("log").prepend(d); }
-
+/* ---------- 通用 UI ---------- */
+function toast(msg, ms){
+  const t = $("toast");
+  t.textContent = msg;
+  t.style.display = "block";
+  clearTimeout(t._tm);
+  t._tm = setTimeout(()=> t.style.display = "none", ms || 1800);
+}
+function logMsg(cls, msg){
+  const d = document.createElement("div");
+  d.className = cls;
+  d.textContent = msg;
+  $("log").prepend(d);
+}
 function popup(title, bodyHtml){
   $("modalTitle").textContent = title;
   $("modalBody").innerHTML = bodyHtml;
@@ -176,12 +194,6 @@ function popup(title, bodyHtml){
 $("modalOk").onclick = () => $("modalMask").classList.remove("show");
 $("modalMask").onclick = e => { if(e.target === $("modalMask")) $("modalMask").classList.remove("show"); };
 
-function isSecureEnv(){
-  return window.isSecureContext === true ||
-         location.protocol === "https:" ||
-         location.hostname === "localhost" ||
-         location.hostname === "127.0.0.1";
-}
 function hasGetUserMedia(){
   return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
 }
@@ -189,27 +201,28 @@ function hasGetUserMedia(){
   var problems = [];
   if(location.protocol === "file:"){
     problems.push("当前是用 <b>双击文件（file://）</b> 方式打开的，浏览器禁止网页调用摄像头。");
-  } else if(!isSecureEnv()){
-    problems.push("当前地址不是 <b>https</b> 也不是 <b>localhost</b>，浏览器禁止网页调用摄像头。");
+  } else if(location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1"){
+    problems.push("当前地址不是 <b>https</b>，浏览器禁止网页调用摄像头。");
   }
   if(!hasGetUserMedia()){
     problems.push("当前浏览器未提供摄像头接口（可能是微信/QQ 等内置浏览器，或系统版本过低）。");
   }
   if(problems.length){
     var tips =
-      "<b>相机扫码不可用的原因：</b><br>" +
+      "<b>网页扫码不可用的原因：</b><br>" +
       problems.map(function(p,i){ return (i+1) + ". " + p; }).join("<br>") +
-      "<br><br><b>解决办法（任选其一）：</b><br>" +
-      "① 电脑上：在文件所在目录执行 <code>python -m http.server 8000</code>，" +
-      "然后浏览器打开 <code>http://localhost:8000/</code> 使用本页面；<br>" +
-      "② 手机上：把页面放到 https 网站上（如 GitHub Pages / Vercel），" +
-      "用 <b>Chrome 或 Safari</b> 打开，不要用微信内置浏览器；<br>" +
-      "③ 没有摄像头也能用：直接在下方输入框<b>手动输入条码</b>核对。";
+      "<br><br><b>解决办法：</b><br>" +
+      "① 手机上：把页面放到 https 网站上（如 GitHub Pages），" +
+      "用 <b>Chrome 或系统自带浏览器</b> 打开，不要用微信内置浏览器；<br>" +
+      "② 电脑上：在文件所在目录执行 <code>python -m http.server 8000</code>，" +
+      "然后浏览器打开 <code>http://localhost:8000/</code>；<br>" +
+      "③ 直接在下方输入框手动输入条码核对。";
     $("envWarn").innerHTML = tips;
     $("envWarn").style.display = "block";
   }
 })();
 
+/* ---------- 上传解析 ---------- */
 $("btnUpload").onclick = () => {
   const inp = document.createElement("input");
   inp.type = "file"; inp.accept = ".xlsx,.xls,.csv";
@@ -228,16 +241,32 @@ $("btnUpload").onclick = () => {
       matchColIdx = headers.findIndex(h => h.toUpperCase() === "RML/RMD");
       if(matchColIdx < 0) matchColIdx = headers.findIndex(h => h.replace(/\s/g,"").toUpperCase().includes("RML"));
       if(matchColIdx < 0){ toast("未找到 RML/RMD 列，请检查表头"); return; }
-      $("colBadge").style.display = "inline"; $("colBadge").textContent = "核对列：" + headers[matchColIdx];
+
+      $("colBadge").style.display = "inline";
+      $("colBadge").textContent = "核对列：" + headers[matchColIdx];
+
       matchedSet = new Set();
+      buildIndex();
       renderTable(); updateStats();
-      $("scanCard").style.display = "block"; $("tableCard").style.display = "block";
+
+      $("scanCard").style.display = "block";
+      $("tableCard").style.display = "block";
       $("manualInput").focus();
       toast("已读取 " + rows.length + " 行数据");
     } catch(err){ toast("读取失败：" + err.message); }
   };
   inp.click();
 };
+
+function buildIndex(){
+  codeIndex = new Map();
+  rows.forEach((r, i) => {
+    const k = String(r[matchColIdx] ?? "").trim();
+    if(!k) return;
+    if(!codeIndex.has(k)) codeIndex.set(k, []);
+    codeIndex.get(k).push(i);
+  });
+}
 
 function renderTable(){
   let html = "<tr>" + headers.map(h=>"<th>"+esc(h)+"</th>").join("") + "</tr>";
@@ -255,125 +284,266 @@ function updateStats(){
   $("stLeft").textContent = rows.length - matchedSet.size;
 }
 
+/* ---------- 核对逻辑 ---------- */
 function check(code){
   code = String(code||"").trim(); if(!code) return;
-  const norm = s => String(s).trim();
+  const list = codeIndex.get(code);
   let hit = -1, dup = false;
-  rows.forEach((r,i)=>{
-    if(norm(r[matchColIdx]) === code){
-      if(matchedSet.has(i)) dup = true; else { hit = i; matchedSet.add(i); }
-    }
-  });
+  if(list){
+    for(const i of list){ if(!matchedSet.has(i)){ hit = i; break; } }
+    if(hit < 0) dup = true;
+  }
   const ts = new Date().toLocaleTimeString();
   if(hit >= 0){
+    matchedSet.add(hit);
     logMsg("ok", ts + " ✅ 匹配成功：" + code);
     renderTable(); updateStats(); speak("可以送");
     const tr = document.querySelector("tr[data-i='"+hit+"']");
     if(tr) tr.scrollIntoView({block:"center", behavior:"smooth"});
     toast("✅ 已标红：" + code);
   } else if(dup){
-    logMsg("dup", ts + " ⚠️ 重复扫描：" + code); speak("重复"); toast("⚠️ 该条码已核对过");
+    logMsg("dup", ts + " ⚠️ 重复扫描：" + code); speak("重复扫描"); toast("⚠️ 重复扫描：该条码已核对过");
   } else {
     logMsg("miss", ts + " ❌ 未在表格中找到：" + code); speak("需滞留"); toast("❌ 未找到该条码");
   }
   if(matchedSet.size === rows.length && rows.length) speak("核对完成");
 }
-$("manualInput").addEventListener("keydown", e => { if(e.key==="Enter"){ check($("manualInput").value); $("manualInput").value=""; } });
+$("manualInput").addEventListener("keydown", e => {
+  if(e.key === "Enter"){ check($("manualInput").value); $("manualInput").value=""; }
+});
 $("btnManual").onclick = () => { check($("manualInput").value); $("manualInput").value=""; $("manualInput").focus(); };
 
-let scanner = null, scanning = false, starting = false;
+/* =========================================================
+   扫码：全力调用原生 BarcodeDetector + 4K高清流 + 连续对焦
+   ========================================================= */
+let camStream = null, camTrack = null, camVideo = null;
+let nativeDetector = null, scanning = false, starting = false;
+let scanTimer = null, loopBusy = false;
+let scanner = null, fallbackMode = false;
+let lastCode = "", lastCodeTime = 0;
+
+function emitCode(code){
+  code = String(code||"").trim();
+  if(!code) return;
+  const now = Date.now();
+  if(code === lastCode && now - lastCodeTime < 2000) return;
+  lastCode = code; lastCodeTime = now;
+  check(code);
+}
+
+const WANTED_FORMATS = ["ean_13","ean_8","upc_a","upc_e","code_128","code_39","code_93", "itf","codabar","qr_code"];
+
+async function makeDetector(){
+  if(!("BarcodeDetector" in window)) return null;
+  try{
+    const sup = await BarcodeDetector.getSupportedFormats();
+    const formats = WANTED_FORMATS.filter(f => sup.includes(f));
+    if(formats.length) return new BarcodeDetector({ formats });
+  }catch(e){}
+  return null;
+}
+
+async function tuneTrack(track){
+  if(!track) return;
+  const caps = (track.getCapabilities ? track.getCapabilities() : {}) || {};
+  const adv = [];
+  // 强制开启连续对焦（这是清晰的核心）
+  if(Array.isArray(caps.focusMode) && caps.focusMode.includes("continuous")) adv.push({ focusMode: "continuous" });
+  if(Array.isArray(caps.exposureMode) && caps.exposureMode.includes("continuous")) adv.push({ exposureMode: "continuous" });
+  if(adv.length){ try{ await track.applyConstraints({ advanced: adv }); }catch(e){} }
+
+  // 强制拉高分辨率
+  try{
+    await track.applyConstraints({
+      width: { ideal: 3840 },
+      height: { ideal: 2160 }
+    });
+  }catch(e){}
+}
+
+/* 核心：最高清实时扫码 */
+async function startNativeScan(){
+  const det = await makeDetector();
+  if(!det) throw new Error("no-native-detector"); // 浏览器不支持原生接口，走降级方案
+
+  const container = $("reader");
+  container.innerHTML = "";
+
+  const video = document.createElement("video");
+  video.setAttribute("playsinline", "");
+  video.setAttribute("muted", "");
+  video.autoplay = true;
+  video.muted = true;
+  container.appendChild(video);
+
+  const overlay = document.createElement("div");
+  overlay.className = "scan-frame";
+  container.appendChild(overlay);
+
+  // 直接尝试请求4K视频流
+  let stream = null, lastErr = null;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: {
+        facingMode: { ideal: "environment" },
+        width: { ideal: 3840 },
+        height: { ideal: 2160 },
+        frameRate: { ideal: 30 }
+      }
+    });
+  } catch(e) {
+    lastErr = e;
+    // 如果4K被拒绝，退而求其次请求1080p
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } }
+      });
+    } catch(e2) { lastErr = e2; }
+  }
+  if(!stream) throw lastErr || new Error("无法打开摄像头");
+
+  video.srcObject = stream;
+  camStream = stream;
+  camTrack = stream.getVideoTracks()[0];
+  await video.play();
+  
+  // 启动后立即强制对焦和高清
+  await tuneTrack(camTrack);
+
+  // 点击画面手动对焦（如果手机支持）
+  video.addEventListener("click", async ev => {
+    if(!camTrack || !camTrack.getCapabilities) return;
+    const caps = camTrack.getCapabilities();
+    if(!caps.pointsOfInterest) return;
+    const rect = video.getBoundingClientRect();
+    const x = (ev.clientX - rect.left) / rect.width;
+    const y = (ev.clientY - rect.top) / rect.height;
+    try{
+      await camTrack.applyConstraints({ advanced: [{ pointsOfInterest: [{ x, y }] }, { focusMode: "single-shot" }] });
+      setTimeout(()=>{ try{ camTrack.applyConstraints({ advanced:[{ focusMode:"continuous" }] }); }catch(e){} }, 2000);
+    }catch(e){}
+  });
+
+  nativeDetector = det;
+  camVideo = video;
+  scanning = true;
+  scanLoop();
+  return true;
+}
+
+async function scanLoop(){
+  if(!scanning || !nativeDetector || !camVideo) return;
+  if(!loopBusy && camVideo.readyState >= 2 && camVideo.videoWidth > 0){
+    loopBusy = true;
+    try{
+      // 调用手机硬件级原生解码，速度极快
+      const codes = await nativeDetector.detect(camVideo);
+      if(codes && codes.length){
+        for(const c of codes){ if(c.rawValue) emitCode(c.rawValue); }
+      }
+    }catch(e){}
+    loopBusy = false;
+  }
+  scanTimer = setTimeout(scanLoop, 80); // 毫秒级扫描循环
+}
+
+/* 降级方案（仅当手机完全不支持原生接口，如老版本iOS） */
+async function startFallbackScan(){
+  if(typeof Html5Qrcode === "undefined") throw new Error("扫码库未加载");
+  fallbackMode = true;
+  const el = $("reader");
+  el.innerHTML = "";
+  scanner = new Html5Qrcode("reader", false);
+  await scanner.start(
+    { facingMode: "environment" },
+    { fps: 15, qrbox: { width: 280, height: 160 }, experimentalFeatures: { useBarCodeDetectorIfSupported: true } },
+    code => emitCode(code),
+    () => {}
+  );
+  await boostStreamResolution();
+  scanning = true;
+}
+
+async function boostStreamResolution(){
+  const v = $("reader").querySelector("video");
+  if(!v || !v.srcObject) return;
+  const t = v.srcObject.getVideoTracks()[0];
+  if(!t) return;
+  try{ await t.applyConstraints({ width: { ideal: 1920 }, height: { ideal: 1080 }, advanced: [{ focusMode: "continuous" }] }); }catch(e){}
+}
+
+function stopCamStream(){
+  if(camStream){ try{ camStream.getTracks().forEach(t => t.stop()); }catch(e){} }
+  camStream = null; camTrack = null; camVideo = null; nativeDetector = null;
+}
+
+async function stopScan(){
+  scanning = false;
+  if(scanTimer){ clearTimeout(scanTimer); scanTimer = null; }
+  if(fallbackMode && scanner){
+    try{ await scanner.stop(); }catch(e){}
+    try{ scanner.clear(); }catch(e){}
+    scanner = null; fallbackMode = false;
+  }
+  stopCamStream();
+  const el = $("reader");
+  el.innerHTML = "";
+  el.style.display = "none";
+  $("btnCamera").style.display = "inline-block";
+  $("btnStop").style.display = "none";
+}
 
 function cameraErrText(e){
   const name = (e && e.name) || "";
   const raw  = (e && e.message) ? e.message : String(e || "");
   switch(name){
-    case "NotAllowedError":
-    case "PermissionDeniedError":
-      return "摄像头权限被拒绝。\n\n请点击浏览器地址栏左侧的 🔒/ⓘ 图标 → 网站设置 → 摄像头 → 改为「允许」，然后刷新页面重试。";
-    case "NotFoundError":
-    case "DevicesNotFoundError":
-      return "没有检测到摄像头设备。\n\n请确认设备有摄像头，且未被系统禁用。";
-    case "NotReadableError":
-    case "TrackStartError":
-      return "摄像头被占用或无法读取。\n\n请关闭其他正在使用摄像头的程序（相机、微信、会议软件等）后重试。";
-    case "OverconstrainedError":
-      return "找不到符合要求的摄像头（如后置摄像头）。\n\n可尝试用其他设备，或改用手动输入条码。";
-    case "SecurityError":
-      return "浏览器安全策略阻止了摄像头调用。\n\n请用 https 或 http://localhost 打开本页面。";
-    default:
-      return "错误类型：" + (name || "未知") + "\n" + raw;
+    case "NotAllowedError": return "摄像头权限被拒绝。\n\n请点击浏览器地址栏左侧的 🔒 图标，把摄像头改为「允许」，刷新重试。";
+    case "NotFoundError": return "没有检测到摄像头设备。";
+    case "NotReadableError": return "摄像头被占用。请关闭其他使用相机的程序后重试。";
+    case "OverconstrainedError": return "手机不支持这么高的分辨率。";
+    default: return "错误类型：" + (name || "未知") + "\n" + raw;
   }
 }
 
 $("btnCamera").onclick = async () => {
   if(scanning || starting) return;
-
-  if(typeof Html5Qrcode === "undefined"){
-    popup("扫码组件未加载", "扫码库（html5-qrcode）没有加载成功。\n\n请检查网络后刷新页面重试。");
-    return;
-  }
   if(!hasGetUserMedia()){
-    popup("当前环境不支持摄像头",
-      "浏览器没有提供摄像头接口。\n\n" +
-      "<b>当前地址：</b><br><code>" + location.href + "</code><br><br>" +
-      "常见原因：<br>" +
-      "1. 用 file:// 双击打开，或地址不是 https / localhost；<br>" +
-      "2. 在微信、QQ、钉钉等内置浏览器中打开。<br><br>" +
-      "<b>建议：</b>用系统自带浏览器（Chrome / Safari）通过 https 打开，" +
-      "或直接在输入框手动输入条码。");
+    popup("不支持摄像头", "请使用 Chrome 或系统自带浏览器打开，不要用微信内置浏览器。");
     return;
   }
-
   starting = true;
   $("btnCamera").disabled = true;
-
-  try{
-    const cams = await Html5Qrcode.getCameras();
-    if(!cams || !cams.length){
-      popup("未检测到摄像头", "系统没有返回任何摄像头设备。\n\n请确认设备有摄像头且未被禁用。");
-      return;
-    }
-  }catch(e){
-    popup("获取摄像头失败", cameraErrText(e));
-    return;
-  }finally{
-    starting = false;
-    $("btnCamera").disabled = false;
-  }
-
-  if(!scanner){
-    scanner = new Html5Qrcode("reader", false);
-  }
   $("reader").style.display = "block";
 
   try{
-    await scanner.start(
-      { facingMode: "environment" },
-      { fps: 10, qrbox: { width: 260, height: 160 } },
-      code => { check(code); },
-      () => {}
-    );
+    let ok = false;
+    if("BarcodeDetector" in window){
+      try{ ok = await startNativeScan(); }
+      catch(e){
+        console.warn("原生扫码不可用，回退降级方案：", e);
+        stopCamStream();
+        $("reader").innerHTML = "";
+      }
+    }
+    if(!ok){ await startFallbackScan(); }
+
     scanning = true;
     $("btnCamera").style.display = "none";
     $("btnStop").style.display = "inline-block";
   }catch(e){
-    try { await scanner.clear(); } catch(_){}
-    $("reader").style.display = "none";
+    await stopScan();
     popup("无法开启相机", cameraErrText(e));
+  }finally{
+    starting = false;
+    $("btnCamera").disabled = false;
   }
 };
 
-$("btnStop").onclick = async () => {
-  if(scanner && scanning){
-    try { await scanner.stop(); } catch(e){}
-    try { scanner.clear(); } catch(e){}
-  }
-  scanning = false;
-  $("reader").style.display = "none";
-  $("btnCamera").style.display = "inline-block";
-  $("btnStop").style.display = "none";
-};
+$("btnStop").onclick = () => { stopScan(); };
 
+/* ---------- 语音播报 ---------- */
 function speak(text){
   try{
     speechSynthesis.cancel();
@@ -383,6 +553,7 @@ function speak(text){
   }catch(e){}
 }
 
+/* ---------- 导出 ---------- */
 $("btnExport").onclick = async () => {
   if(!rows.length) return;
   try{
@@ -401,16 +572,17 @@ $("btnExport").onclick = async () => {
     headers.forEach((h,j)=>{ ws.getColumn(j+1).width = Math.max(12, String(h).length*2 + 6); });
     const buf = await wb.xlsx.writeBuffer();
     const outName = fileBase + "_已核对.xlsx";
-    $("exportName").textContent = "已生成：" + outName + "（匹配行已在文件中标红）";
+    $("exportName").textContent = "已生成：" + outName;
     const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
     const file = new File([blob], outName, { type: blob.type });
     if(navigator.canShare && navigator.canShare({ files: [file] })) {
-      try { await navigator.share({ files: [file], title: "飞利浦收货核对结果" }); return; } catch(e){ if(e.name==="AbortError") return; }
+      try { await navigator.share({ files: [file], title: "核对结果" }); return; }
+      catch(e){ if(e.name === "AbortError") return; }
     }
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob); a.download = outName; a.click();
     setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
-    toast("已下载，可从浏览器分享文件");
+    toast("已下载");
   }catch(err){ toast("导出失败：" + err.message); }
 };
 </script>
