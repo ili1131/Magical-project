@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>飞利浦收货核对</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; margin: 0; background: #f4f6f9; color: #1a1a2e; }
+  header { background: #0b5ed7; color: #fff; padding: 14px 16px; display: flex; align-items: center; gap: 10px; }
+  header h1 { font-size: 18px; margin: 0; flex: 1; }
+  .badge { background: rgba(255,255,255,.2); border-radius: 20px; padding: 3px 10px; font-size: 12px; }
+  main { max-width: 960px; margin: 0 auto; padding: 14px; }
+  .card { background: #fff; border-radius: 12px; padding: 14px; margin-bottom: 14px; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+  .btn { display: inline-block; border: none; border-radius: 10px; padding: 12px 18px; font-size: 15px; cursor: pointer; margin: 4px 4px 4px 0; font-weight: 600; }
+  .btn-primary { background: #0b5ed7; color: #fff; }
+  .btn-success { background: #198754; color: #fff; }
+  .btn-danger  { background: #dc3545; color: #fff; }
+  .btn-secondary { background: #6c757d; color: #fff; }
+  .btn-warning { background: #fd7e14; color: #fff; }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .stats { display: flex; gap: 10px; flex-wrap: wrap; }
+  .stat { flex: 1; min-width: 90px; background: #f0f4fa; border-radius: 10px; padding: 10px; text-align: center; }
+  .stat b { display: block; font-size: 22px; }
+  #reader { position: relative; width: 100%; max-width: 480px; margin: 10px auto 0; display: none; border-radius: 10px; overflow: hidden; background: #000; }
+  #reader video { width: 100%; display: block; background: #000; }
+  .scan-frame { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 78%; height: 46%; border: 2px solid rgba(255,80,80,.9); border-radius: 10px; box-shadow: 0 0 0 9999px rgba(0,0,0,.18); pointer-events: none; }
+  .scan-frame::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 2px; background: rgba(255,80,80,.85); animation: scanline 2s ease-in-out infinite; }
+  @keyframes scanline { 0%,100% { top: 8%; } 50% { top: 92%; } }
+  .manual-row { display: flex; gap: 8px; margin-top: 10px; }
+  .manual-row input { flex: 1; padding: 12px; border: 2px solid #0b5ed7; border-radius: 10px; font-size: 16px; }
+  .log { max-height: 180px; overflow-y: auto; font-size: 13px; margin-top: 10px; border-top: 1px dashed #ddd; padding-top: 8px; }
+  .log .ok { color: #198754; }
+  .log .dup { color: #fd7e14; }
+  .log .miss { color: #dc3545; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { border: 1px solid #e3e7ee; padding: 7px 8px; text-align: left; white-space: nowrap; }
+  th { background: #eef2f8; position: sticky; top: 0; }
+  tr.matched td { background: #ffe3e3 !important; color: #b02a37; font-weight: 700; }
+  .table-wrap { max-height: 50vh; overflow: auto; border-radius: 8px; }
+  .hint { color: #666; font-size: 13px; line-height: 1.6; }
+  #fileName { font-size: 13px; color: #0b5ed7; margin-left: 6px; word-break: break-all; }
+  .toast { position: fixed; left: 50%; bottom: 60px; transform: translateX(-50%); background: rgba(0,0,0,.8); color: #fff; padding: 10px 20px; border-radius: 24px; font-size: 14px; display: none; z-index: 99; max-width: 80vw; text-align: center; }
+  #loadStatus { position: fixed; inset: 0; background: rgba(255,255,255,.92); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; z-index: 100; font-size: 15px; color: #333; }
+  .spinner { width: 36px; height: 36px; border: 4px solid #dbe4f0; border-top-color: #0b5ed7; border-radius: 50%; animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #loadRetry { display: none; }
+  #envWarn { display: none; background: #fff3cd; color: #7a5b00; border: 1px solid #ffe69c; border-radius: 10px; padding: 10px 12px; font-size: 13px; line-height: 1.6; margin-bottom: 14px; }
+  #envWarn b { color: #b02a37; }
+  #modalMask { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: none; align-items: center; justify-content: center; z-index: 200; padding: 18px; }
+  #modalMask.show { display: flex; }
+  #modal { background: #fff; border-radius: 14px; max-width: 420px; width: 100%; padding: 20px; box-shadow: 0 8px 30px rgba(0,0,0,.25); }
+  #modal h3 { margin: 0 0 10px; font-size: 16px; color: #b02a37; }
+  #modal .mbody { font-size: 14px; line-height: 1.7; color: #333; white-space: pre-wrap; word-break: break-word; }
+  #modal .mbody code { background: #f0f4fa; padding: 1px 5px; border-radius: 4px; font-size: 12px; word-break: break-all; }
+  #modal .mfoot { text-align: right; margin-top: 16px; }
+</style>
+</head>
+<body>
+<div id="loadStatus">
+  <div class="spinner"></div>
+  <div id="loadText">正在加载组件，请稍候…</div>
+  <button class="btn btn-primary" id="loadRetry" onclick="location.reload()">加载失败，点击重试</button>
+</div>
+
+<header>
+  <h1>📦 飞利浦收货核对</h1>
+  <span class="badge" id="colBadge" style="display:none"></span>
+</header>
+
+<main>
+  <div id="envWarn"></div>
+
+  <div class="card">
+    <button class="btn btn-primary" id="btnUpload" disabled>① 上传 Excel 表格</button><span id="fileName"></span>
+    <div class="hint" style="margin-top:8px">
+      支持 .xlsx / .xls / .csv。系统会自动查找标题为 <b>RML/RMD</b> 的列作为核对列。
+    </div>
+  </div>
+
+  <div class="card" id="scanCard" style="display:none">
+    <button class="btn btn-success" id="btnCamera">② 开启相机扫码</button>
+    <button class="btn btn-danger" id="btnStop" style="display:none">停止扫码</button>
+    <button class="btn btn-warning" id="btnPhoto">📷 用手机原相机拍照识别</button>
+    <input type="file" id="fileCam" accept="image/*" capture="environment" style="display:none">
+    <div id="reader"></div>
+    <div class="manual-row">
+      <input id="manualInput" placeholder="或手动输入 / 粘贴条码后回车" autocomplete="off">
+      <button class="btn btn-secondary" id="btnManual">核对</button>
+    </div>
+    <div class="hint" style="margin-top:6px">
+      💡 页面内扫码用的是浏览器视频流，清晰度受限制；<b>原相机拍照识别</b>会调用手机自带相机，用最高像素拍照后识别，成功率明显更高。拍照时请让条码尽量占满画面。
+    </div>
+    <div class="log" id="log"></div>
+  </div>
+
+  <div class="card" id="statCard" style="display:none">
+    <div class="stats">
+      <div class="stat">总数<b id="stTotal">0</b></div>
+      <div class="stat" style="color:#198754">已核对<b id="stDone">0</b></div>
+      <div class="stat" style="color:#dc3545">未核对<b id="stLeft">0</b></div>
+    </div>
+  </div>
+
+  <div class="card" id="tableCard" style="display:none">
+    <button class="btn btn-success" id="btnExport">③ 导出核对结果并分享</button>
+    <span id="exportName" class="hint"></span>
+    <div class="table-wrap" style="margin-top:10px"><table id="grid"></table></div>
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<div id="modalMask">
+  <div id="modal">
+    <h3 id="modalTitle">提示</h3>
+    <div class="mbody" id="modalBody"></div>
+    <div class="mfoot"><button class="btn btn-primary" id="modalOk">知道了</button></div>
+  </div>
+</div>
+
+<script>
+/* ===== 多 CDN 容错加载 ===== */
+var LIBS = {
+  XLSX: [
+    "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js",
+    "https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js",
+    "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js",
+    "https://cdn.bootcdn.net/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"
+  ],
+  ExcelJS: [
+    "https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js",
+    "https://unpkg.com/exceljs@4.4.0/dist/exceljs.min.js",
+    "https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js",
+    "https://cdn.bootcdn.net/ajax/libs/exceljs/4.4.0/exceljs.min.js"
+  ],
+  Html5Qrcode: [
+    "https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js",
+    "https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js",
+    "https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js",
+    "https://cdn.bootcdn.net/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"
+  ]
+};
+function loadOne(urls, i, ok, fail){
+  if(i >= urls.length){ fail(); return; }
+  var s = document.createElement("script");
+  s.src = urls[i];
+  s.onload = ok;
+  s.onerror = function(){ loadOne(urls, i+1, ok, fail); };
+  document.head.appendChild(s);
+}
+function loadAll(names, done){
+  if(!names.length){ done(true); return; }
+  var name = names[0];
+  loadOne(LIBS[name], 0, function(){ loadAll(names.slice(1), done); },
+    function(){ done(false, name); });
+}
+loadAll(["XLSX","ExcelJS","Html5Qrcode"], function(ok, which){
+  var st = document.getElementById("loadStatus");
+  if(ok){
+    st.style.display = "none";
+    document.getElementById("btnUpload").disabled = false;
+  } else {
+    document.getElementById("loadText").textContent = "组件 " + which + " 加载失败，请检查网络后重试";
+    document.getElementById("loadText").style.color = "#dc3545";
+    document.getElementById("loadRetry").style.display = "inline-block";
+    st.querySelector(".spinner").style.display = "none";
+  }
+});
+</script>
+
+<script>
+let sheetName = "", headers = [], rows = [];
+let matchColIdx = -1, matchedSet = new Set(), codeIndex = new Map();
+let fileBase = "核对结果";
+const $ = id => document.getElementById(id);
+
+/* ---------- 通用 UI ---------- */
+function toast(msg, ms){
+  const t = $("toast");
+  t.textContent = msg;
+  t.style.display = "block";
+  clearTimeout(t._tm);
+  t._tm = setTimeout(()=> t.style.display = "none", ms || 1800);
+}
+function logMsg(cls, msg){
+  const d = document.createElement("div");
+  d.className = cls;
+  d.textContent = msg;
+  $("log").prepend(d);
+}
+function popup(title, bodyHtml){
+  $("modalTitle").textContent = title;
+  $("modalBody").innerHTML = bodyHtml;
+  $("modalMask").classList.add("show");
+}
+$("modalOk").onclick = () => $("modalMask").classList.remove("show");
+$("modalMask").onclick = e => { if(e.target === $("modalMask")) $("modalMask").classList.remove("show"); };
+
+function isSecureEnv(){
+  return window.isSecureContext === true ||
+         location.protocol === "https:" ||
+         location.hostname === "localhost" ||
+         location.hostname === "127.0.0.1";
+}
+function hasGetUserMedia(){
+  return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+}
+(function envCheck(){
+  var problems = [];
+  if(location.protocol === "file:"){
+    problems.push("当前是用 <b>双击文件（file://）</b> 方式打开的，浏览器禁止网页调用摄像头。");
+  } else if(!isSecureEnv()){
+    problems.push("当前地址不是 <b>https</b> 也不是 <b>localhost</b>，浏览器禁止网页调用摄像头。");
+  }
+  if(!hasGetUserMedia()){
+    problems.push("当前浏览器未提供摄像头接口（可能是微信/QQ 等内置浏览器，或系统版本过低）。");
+  }
+  if(problems.length){
+    var tips =
+      "<b>页面内相机扫码不可用的原因：</b><br>" +
+      problems.map(function(p,i){ return (i+1) + ". " + p; }).join("<br>") +
+      "<br><br><b>解决办法（任选其一）：</b><br>" +
+      "① 电脑上：在文件所在目录执行 <code>python -m http.server 8000</code>，" +
+      "然后浏览器打开 <code>http://localhost:8000/</code> 使用本页面；<br>" +
+      "② 手机上：把页面放到 https 网站上（如 GitHub Pages / Vercel），" +
+      "用 <b>Chrome 或 Safari</b> 打开，不要用微信内置浏览器；<br>" +
+      "③ <b>用手机原相机拍照识别</b>或直接在下方输入框手动输入条码核对（不需要摄像头权限）。";
+    $("envWarn").innerHTML = tips;
+    $("envWarn").style.display = "block";
+  }
+})();
+
+/* ---------- 上传解析 ---------- */
+$("btnUpload").onclick = () => {
+  const inp = document.createElement("input");
+  inp.type = "file"; inp.accept = ".xlsx,.xls,.csv";
+  inp.onchange = async e => {
+    const f = e.target.files[0]; if(!f) return;
+    $("fileName").textContent = f.name;
+    fileBase = f.name.replace(/\.[^.]+$/,"");
+    try {
+      const wb = XLSX.read(await f.arrayBuffer());
+      sheetName = wb.SheetNames[0];
+      const ws = wb.Sheets[sheetName];
+      const arr = XLSX.utils.sheet_to_json(ws, {header:1, defval:""});
+      if(!arr.length){ toast("表格为空"); return; }
+      headers = arr[0].map(h => String(h).trim());
+      rows = arr.slice(1).filter(r => r.some(c => String(c).trim() !== ""));
+      matchColIdx = headers.findIndex(h => h.toUpperCase() === "RML/RMD");
+      if(matchColIdx < 0) matchColIdx = headers.findIndex(h => h.replace(/\s/g,"").toUpperCase().includes("RML"));
+      if(matchColIdx < 0){ toast("未找到 RML/RMD 列，请检查表头"); return; }
+
+      $("colBadge").style.display = "inline";
+      $("colBadge").textContent = "核对列：" + headers[matchColIdx];
+
+      matchedSet = new Set();
+      buildIndex();
+      renderTable(); updateStats();
+
+      $("scanCard").style.display = "block";
+      $("tableCard").style.display = "block";
+      $("manualInput").focus();
+      toast("已读取 " + rows.length + " 行数据");
+    } catch(err){ toast("读取失败：" + err.message); }
+  };
+  inp.click();
+};
+
+/* 建立「条码 → 行号」索引，扫码匹配瞬间完成 */
+function buildIndex(){
+  codeIndex = new Map();
+  rows.forEach((r, i) => {
+    const k = String(r[matchColIdx] ?? "").trim();
+    if(!k) return;
+    if(!codeIndex.has(k)) codeIndex.set(k, []);
+    codeIndex.get(k).push(i);
+  });
+}
+
+function renderTable(){
+  let html = "<tr>" + headers.map(h=>"<th>"+esc(h)+"</th>").join("") + "</tr>";
+  rows.forEach((r,i)=>{
+    html += "<tr data-i='"+i+"' class='"+(matchedSet.has(i)?"matched":"")+"'>"
+          + headers.map((_,j)=>"<td>"+esc(String(r[j]??""))+"</td>").join("") + "</tr>";
+  });
+  $("grid").innerHTML = html;
+}
+function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+function updateStats(){
+  $("statCard").style.display = "block";
+  $("stTotal").textContent = rows.length;
+  $("stDone").textContent = matchedSet.size;
+  $("stLeft").textContent = rows.length - matchedSet.size;
+}
+
+/* ---------- 核对 ---------- */
+function check(code){
+  code = String(code||"").trim(); if(!code) return;
+  const list = codeIndex.get(code);
+  let hit = -1, dup = false;
+  if(list){
+    for(const i of list){ if(!matchedSet.has(i)){ hit = i; break; } }
+    if(hit < 0) dup = true;
+  }
+  const ts = new Date().toLocaleTimeString();
+  if(hit >= 0){
+    matchedSet.add(hit);
+    logMsg("ok", ts + " ✅ 匹配成功：" + code);
+    renderTable(); updateStats(); speak("可以送");
+    const tr = document.querySelector("tr[data-i='"+hit+"']");
+    if(tr) tr.scrollIntoView({block:"center", behavior:"smooth"});
+    toast("✅ 已标红：" + code);
+  } else if(dup){
+    logMsg("dup", ts + " ⚠️ 重复扫描：" + code); speak("重复扫描"); toast("⚠️ 重复扫描：该条码已核对过");
+  } else {
+    logMsg("miss", ts + " ❌ 未在表格中找到：" + code); speak("需滞留"); toast("❌ 未找到该条码");
+  }
+  if(matchedSet.size === rows.length && rows.length) speak("核对完成");
+}
+$("manualInput").addEventListener("keydown", e => {
+  if(e.key === "Enter"){ check($("manualInput").value); $("manualInput").value=""; }
+});
+$("btnManual").onclick = () => { check($("manualInput").value); $("manualInput").value=""; $("manualInput").focus(); };
+
+/* =========================================================
+   相机扫码：优先「原生 BarcodeDetector + 高分辨率视频流」
+             失败再回退到 html5-qrcode
+   ========================================================= */
+let camStream = null, camTrack = null, camVideo = null;
+let nativeDetector = null, scanning = false, starting = false;
+let scanTimer = null, loopBusy = false;
+let scanner = null, fallbackMode = false;
+let lastCode = "", lastCodeTime = 0;
+const SCAN_INTERVAL = 80;   // 原生检测间隔(ms)
+const DUP_WINDOW = 2000;    // 同一码静默窗口(ms)
+
+function emitCode(code){
+  code = String(code||"").trim();
+  if(!code) return;
+  const now = Date.now();
+  if(code === lastCode && now - lastCodeTime < DUP_WINDOW) return;
+  lastCode = code; lastCodeTime = now;
+  check(code);
+}
+
+const WANTED_FORMATS = ["ean_13","ean_8","upc_a","upc_e","code_128","code_39","code_93",
+                        "itf","codabar","qr_code","data_matrix","pdf417","aztec"];
+
+async function makeDetector(){
+  if(!("BarcodeDetector" in window)) return null;
+  let formats = WANTED_FORMATS;
+  try{
+    const sup = await BarcodeDetector.getSupportedFormats();
+    if(Array.isArray(sup) && sup.length){
+      formats = WANTED_FORMATS.filter(f => sup.includes(f));
+      if(!formats.length) formats = sup;
+    }
+  }catch(e){}
+  try { return new BarcodeDetector({ formats }); } catch(e){}
+  try { return new BarcodeDetector(); } catch(e){}
+  return null;
+}
+
+/* 给视频轨道加连续对焦 / 自动曝光 / 提高分辨率 */
+async function tuneTrack(track){
+  if(!track) return;
+  const caps = (track.getCapabilities ? track.getCapabilities() : {}) || {};
+  const adv = [];
+  if(Array.isArray(caps.focusMode) && caps.focusMode.includes("continuous")) adv.push({ focusMode: "continuous" });
+  if(Array.isArray(caps.exposureMode) && caps.exposureMode.includes("continuous")) adv.push({ exposureMode: "continuous" });
+  if(Array.isArray(caps.whiteBalanceMode) && caps.whiteBalanceMode.includes("continuous")) adv.push({ whiteBalanceMode: "continuous" });
+  if(adv.length){ try{ await track.applyConstraints({ advanced: adv }); }catch(e){} }
+
+  const want = {};
+  if(caps.width && caps.height){
+    want.width  = { ideal: Math.min(caps.width.max  || 1920, 1920) };
+    want.height = { ideal: Math.min(caps.height.max || 1080, 1080) };
+  } else {
+    want.width = { ideal: 1920 };
+    want.height = { ideal: 1080 };
+  }
+  try{ await track.applyConstraints(want); }catch(e){}
+}
+
+/* 原生高分辨率扫码 */
+async function startNativeScan(){
+  const det = await makeDetector();
+  if(!det) throw new Error("no-native-detector");
+
+  const container = $("reader");
+  container.innerHTML = "";
+
+  const video = document.createElement("video");
+  video.setAttribute("playsinline", "");
+  video.setAttribute("muted", "");
+  video.autoplay = true;
+  video.muted = true;
+  container.appendChild(video);
+
+  const overlay = document.createElement("div");
+  overlay.className = "scan-frame";
+  container.appendChild(overlay);
+
+  const base = { facingMode: { ideal: "environment" } };
+  const tries = [
+    Object.assign({}, base, { width:{ideal:3840}, height:{ideal:2160}, frameRate:{ideal:30} }),
+    Object.assign({}, base, { width:{ideal:1920}, height:{ideal:1080}, frameRate:{ideal:30} }),
+    Object.assign({}, base, { width:{ideal:1280}, height:{ideal:720} }),
+    base
+  ];
+  let stream = null, lastErr = null;
+  for(const v of tries){
+    try { stream = await navigator.mediaDevices.getUserMedia({ audio:false, video: v }); break; }
+    catch(e){ lastErr = e; }
+  }
+  if(!stream) throw lastErr || new Error("无法打开摄像头");
+
+  video.srcObject = stream;
+  camStream = stream;
+  camTrack = stream.getVideoTracks()[0];
+  try{ await video.play(); }catch(e){}
+
+  await tuneTrack(camTrack);
+
+  /* 点击画面对焦（支持的设备才有） */
+  video.addEventListener("click", async ev => {
+    if(!camTrack || !camTrack.getCapabilities) return;
+    const caps = camTrack.getCapabilities();
+    if(!caps.pointsOfInterest) return;
+    const rect = video.getBoundingClientRect();
+    const x = (ev.clientX - rect.left) / rect.width;
+    const y = (ev.clientY - rect.top) / rect.height;
+    try{
+      await camTrack.applyConstraints({ advanced: [{ pointsOfInterest: [{ x, y }] }, { focusMode: "single-shot" }] });
+      setTimeout(()=>{ try{ camTrack.applyConstraints({ advanced:[{ focusMode:"continuous" }] }); }catch(e){} }, 2000);
+    }catch(e){}
+  });
+
+  nativeDetector = det;
+  camVideo = video;
+  scanning = true;
+  scanLoop();
+  return true;
+}
+
+async function scanLoop(){
+  if(!scanning || !nativeDetector || !camVideo) return;
+  if(!loopBusy && camVideo.readyState >= 2 && camVideo.videoWidth > 0){
+    loopBusy = true;
+    try{
+      const codes = await nativeDetector.detect(camVideo);
+      if(codes && codes.length){
+        for(const c of codes){ if(c.rawValue) emitCode(c.rawValue); }
+      }
+    }catch(e){}
+    loopBusy = false;
+  }
+  scanTimer = setTimeout(scanLoop, SCAN_INTERVAL);
+}
+
+/* html5-qrcode 回退方案 */
+async function startFallbackScan(){
+  if(typeof Html5Qrcode === "undefined") throw new Error("扫码库未加载");
+  fallbackMode = true;
+  const el = $("reader");
+  el.innerHTML = "";
+  scanner = new Html5Qrcode("reader", false);
+
+  const qrbox = (vw, vh) => {
+    const m = Math.min(vw, vh);
+    const s = Math.max(160, Math.floor(m * 0.9));
+    return { width: s, height: s };
+  };
+
+  await scanner.start(
+    { facingMode: "environment" },
+    {
+      fps: 12,
+      qrbox: qrbox,
+      experimentalFeatures: { useBarCodeDetectorIfSupported: true },
+      disableFlip: false
+    },
+    code => emitCode(code),
+    () => {}
+  );
+
+  /* 启动后再把分辨率顶上去 */
+  await boostStreamResolution();
+  scanning = true;
+}
+
+async function boostStreamResolution(){
+  const v = $("reader").querySelector("video");
+  if(!v || !v.srcObject) return;
+  const t = v.srcObject.getVideoTracks()[0];
+  if(!t) return;
+  const caps = (t.getCapabilities ? t.getCapabilities() : {}) || {};
+  const con = {
+    width:  { ideal: caps.width  ? Math.min(caps.width.max  || 1920, 1920) : 1920 },
+    height: { ideal: caps.height ? Math.min(caps.height.max || 1080, 1080) : 1080 }
+  };
+  const adv = [];
+  if(Array.isArray(caps.focusMode) && caps.focusMode.includes("continuous")) adv.push({ focusMode: "continuous" });
+  if(adv.length) con.advanced = adv;
+  try{ await t.applyConstraints(con); }catch(e){}
+}
+
+function stopCamStream(){
+  if(camStream){
+    try{ camStream.getTracks().forEach(t => t.stop()); }catch(e){}
+  }
+  camStream = null; camTrack = null; camVideo = null; nativeDetector = null;
+}
+
+async function stopScan(){
+  scanning = false;
+  if(scanTimer){ clearTimeout(scanTimer); scanTimer = null; }
+  if(fallbackMode && scanner){
+    try{ await scanner.stop(); }catch(e){}
+    try{ scanner.clear(); }catch(e){}
+    scanner = null; fallbackMode = false;
+  }
+  stopCamStream();
+  const el = $("reader");
+  el.innerHTML = "";
+  el.style.display = "none";
+  $("btnCamera").style.display = "inline-block";
+  $("btnStop").style.display = "none";
+}
+
+function cameraErrText(e){
+  const name = (e && e.name) || "";
+  const raw  = (e && e.message) ? e.message : String(e || "");
+  switch(name){
+    case "NotAllowedError":
+    case "PermissionDeniedError":
+      return "摄像头权限被拒绝。\n\n请点击浏览器地址栏左侧的 🔒/ⓘ 图标 → 网站设置 → 摄像头 → 改为「允许」，然后刷新页面重试。";
+    case "NotFoundError":
+    case "DevicesNotFoundError":
+      return "没有检测到摄像头设备。\n\n请确认设备有摄像头，且未被系统禁用。";
+    case "NotReadableError":
+    case "TrackStartError":
+      return "摄像头被占用或无法读取。\n\n请关闭其他正在使用摄像头的程序（相机、微信、会议软件等）后重试。";
+    case "OverconstrainedError":
+      return "找不到符合要求的摄像头（如后置摄像头）。\n\n可尝试用其他设备，或改用「原相机拍照识别」/手动输入。";
+    case "SecurityError":
+      return "浏览器安全策略阻止了摄像头调用。\n\n请用 https 或 http://localhost 打开本页面。";
+    default:
+      return "错误类型：" + (name || "未知") + "\n" + raw;
+  }
+}
+
+$("btnCamera").onclick = async () => {
+  if(scanning || starting) return;
+
+  if(typeof Html5Qrcode === "undefined" && !("BarcodeDetector" in window)){
+    popup("扫码组件未加载", "扫码库（html5-qrcode）没有加载成功。\n\n请检查网络后刷新页面重试。");
+    return;
+  }
+  if(!hasGetUserMedia()){
+    popup("当前环境不支持摄像头",
+      "浏览器没有提供摄像头接口。\n\n" +
+      "<b>当前地址：</b><br><code>" + location.href + "</code><br><br>" +
+      "常见原因：<br>" +
+      "1. 用 file:// 双击打开，或地址不是 https / localhost；<br>" +
+      "2. 在微信、QQ、钉钉等内置浏览器中打开。<br><br>" +
+      "<b>建议：</b>用系统自带浏览器（Chrome / Safari）通过 https 打开，" +
+      "或改用「用手机原相机拍照识别」，也可以直接在输入框手动输入条码。");
+    return;
+  }
+
+  starting = true;
+  $("btnCamera").disabled = true;
+  $("reader").style.display = "block";
+
+  try{
+    let ok = false;
+    if("BarcodeDetector" in window){
+      try{ ok = await startNativeScan(); }
+      catch(e){
+        console.warn("原生扫码不可用，回退 html5-qrcode：", e);
+        stopCamStream();
+        $("reader").innerHTML = "";
+      }
+    }
+    if(!ok){ await startFallbackScan(); }
+
+    scanning = true;
+    $("btnCamera").style.display = "none";
+    $("btnStop").style.display = "inline-block";
+  }catch(e){
+    await stopScan();
+    popup("无法开启相机", cameraErrText(e));
+  }finally{
+    starting = false;
+    $("btnCamera").disabled = false;
+  }
+};
+
+$("btnStop").onclick = () => { stopScan(); };
+
+/* =========================================================
+   手机原相机拍照识别
+   ========================================================= */
+$("btnPhoto").onclick = () => {
+  // 先释放浏览器占用的摄像头，否则系统相机可能打不开
+  stopScan();
+  setTimeout(()=> $("fileCam").click(), 60);
+};
+
+$("fileCam").onchange = async e => {
+  const file = e.target.files && e.target.files[0];
+  e.target.value = "";
+  if(!file) return;
+
+  toast("正在识别图片，请稍候…", 10000);
+  $("btnPhoto").disabled = true;
+  try{
+    const text = await decodeImageFile(file);
+    $("toast").style.display = "none";
+    if(text){
+      emitCode(text);
+    }else{
+      popup("未识别到条码",
+        "照片中没有识别到可用的条码。\n\n建议：\n" +
+        "• 让条码尽量占满画面，对准焦再拍；\n" +
+        "• 避免强反光、阴影、过度倾斜；\n" +
+        "• 可拍多张重试，或手动输入条码核对。");
+    }
+  }catch(err){
+    $("toast").style.display = "none";
+    popup("识别失败", String((err && err.message) || err));
+  }finally{
+    $("btnPhoto").disabled = false;
+  }
+};
+
+/* 解码一张图片：原生 BarcodeDetector 优先，失败回退 html5-qrcode 扫图 */
+async function decodeImageFile(file){
+  const det = await makeDetector();
+  if(det){
+    try{
+      const bmp = await createImageBitmap(file, { imageOrientation: "from-image" });
+      let codes = await det.detect(bmp);
+      if((!codes || !codes.length) && Math.max(bmp.width, bmp.height) > 1600){
+        const small = await downscaleBitmap(bmp, 1600);
+        codes = await det.detect(small);
+        if(small.close) small.close();
+      }
+      if(bmp.close) bmp.close();
+      if(codes && codes.length) return codes[0].rawValue;
+    }catch(e){ /* 继续走回退 */ }
+  }
+  if(typeof Html5Qrcode !== "undefined"){
+    const t = await scanFileWithLib(file);
+    if(t) return t;
+  }
+  return null;
+}
+
+async function downscaleBitmap(bitmap, maxSide){
+  const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+  const w = Math.max(1, Math.round(bitmap.width * scale));
+  const h = Math.max(1, Math.round(bitmap.height * scale));
+  const c = document.createElement("canvas");
+  c.width = w; c.height = h;
+  c.getContext("2d").drawImage(bitmap, 0, 0, w, h);
+  return await createImageBitmap(c);
+}
+
+function scanFileWithLib(file){
+  return new Promise(resolve => {
+    const div = document.createElement("div");
+    div.id = "__h5q_tmp";
+    div.style.cssText = "position:fixed;left:-9999px;top:0;width:320px;height:240px;overflow:hidden;";
+    document.body.appendChild(div);
+
+    let inst = null, settled = false;
+    const done = v => {
+      if(settled) return;
+      settled = true;
+      try{ inst && inst.clear(); }catch(e){}
+      try{ div.remove(); }catch(e){}
+      resolve(v || null);
+    };
+    try{
+      inst = new Html5Qrcode("__h5q_tmp", false);
+      inst.scanFile(file, false).then(txt => done(txt)).catch(() => done(null));
+    }catch(e){ done(null); }
+    setTimeout(() => done(null), 15000);
+  });
+}
+
+/* ---------- 语音播报 ---------- */
+function speak(text){
+  try{
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = "zh-CN"; u.rate = 1.15; u.volume = 1;
+    speechSynthesis.speak(u);
+  }catch(e){}
+}
+
+/* ---------- 导出 ---------- */
+$("btnExport").onclick = async () => {
+  if(!rows.length) return;
+  try{
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet(sheetName || "核对结果");
+    ws.addRow(headers).font = { bold: true };
+    rows.forEach((r,i)=>{
+      const row = ws.addRow(headers.map((_,j)=> r[j] ?? ""));
+      if(matchedSet.has(i)){
+        row.eachCell(cell=>{
+          cell.fill = { type:"pattern", pattern:"solid", fgColor:{ argb:"FFFFC7CE" } };
+          cell.font = { color:{ argb:"FF9C0006" }, bold:true };
+        });
+      }
+    });
+    headers.forEach((h,j)=>{ ws.getColumn(j+1).width = Math.max(12, String(h).length*2 + 6); });
+    const buf = await wb.xlsx.writeBuffer();
+    const outName = fileBase + "_已核对.xlsx";
+    $("exportName").textContent = "已生成：" + outName + "（匹配行已在文件中标红）";
+    const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const file = new File([blob], outName, { type: blob.type });
+    if(navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file], title: "飞利浦收货核对结果" }); return; }
+      catch(e){ if(e.name === "AbortError") return; }
+    }
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = outName; a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
+    toast("已下载，可从浏览器分享文件");
+  }catch(err){ toast("导出失败：" + err.message); }
+};
+</script>
+</body>
+</html>
