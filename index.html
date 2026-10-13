@@ -86,7 +86,7 @@
       <button class="btn btn-secondary" id="btnManual">核对</button>
     </div>
     <div class="hint" style="margin-top:6px; color:#dc3545;">
-      ⚠️ 网页无法调起微信或系统相机App。请务必使用 <b>Chrome 或系统自带浏览器</b> 打开本页面，才能获得最高清的原生级扫码体验。
+      ⚠️ 如果在微信中打开，请点击右上角“在浏览器中打开”。推荐使用 Chrome 或系统自带浏览器，扫码更清晰。
     </div>
     <div class="log" id="log"></div>
   </div>
@@ -172,6 +172,60 @@ let matchColIdx = -1, matchedSet = new Set(), codeIndex = new Map();
 let fileBase = "核对结果";
 const $ = id => document.getElementById(id);
 
+/* ===== 音频处理（核心修复：解决苹果静音问题） ===== */
+let audioCtx = null;
+function initAudio() {
+  if (!audioCtx) {
+    // 兼容苹果的 AudioContext
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (AudioContext) audioCtx = new AudioContext();
+  }
+  if (audioCtx && audioCtx.state === 'suspended') {
+    audioCtx.resume();
+  }
+}
+function playBeep(type) {
+  if (!audioCtx) return;
+  try {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    if (type === 'ok') {
+      osc.frequency.value = 1200; // 高频短促
+      gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+      osc.start(); osc.stop(audioCtx.currentTime + 0.15);
+    } else if (type === 'dup') {
+      osc.frequency.value = 800; // 中频双响
+      gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+      osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+      setTimeout(() => {
+        const osc2 = audioCtx.createOscillator(); const gain2 = audioCtx.createGain();
+        osc2.connect(gain2); gain2.connect(audioCtx.destination);
+        osc2.frequency.value = 800;
+        gain2.gain.setValueAtTime(0.5, audioCtx.currentTime);
+        gain2.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+        osc2.start(); osc2.stop(audioCtx.currentTime + 0.1);
+      }, 150);
+    } else if (type === 'miss') {
+      osc.frequency.value = 400; // 低频长鸣
+      gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+      osc.start(); osc.stop(audioCtx.currentTime + 0.4);
+    }
+  } catch (e) { console.warn("Beep failed", e); }
+}
+
+function speak(text){
+  try{
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = "zh-CN"; u.rate = 1.15; u.volume = 1;
+    speechSynthesis.speak(u);
+  }catch(e){}
+}
+
 /* ---------- 通用 UI ---------- */
 function toast(msg, ms){
   const t = $("toast");
@@ -197,30 +251,6 @@ $("modalMask").onclick = e => { if(e.target === $("modalMask")) $("modalMask").c
 function hasGetUserMedia(){
   return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
 }
-(function envCheck(){
-  var problems = [];
-  if(location.protocol === "file:"){
-    problems.push("当前是用 <b>双击文件（file://）</b> 方式打开的，浏览器禁止网页调用摄像头。");
-  } else if(location.protocol !== "https:" && location.hostname !== "localhost" && location.hostname !== "127.0.0.1"){
-    problems.push("当前地址不是 <b>https</b>，浏览器禁止网页调用摄像头。");
-  }
-  if(!hasGetUserMedia()){
-    problems.push("当前浏览器未提供摄像头接口（可能是微信/QQ 等内置浏览器，或系统版本过低）。");
-  }
-  if(problems.length){
-    var tips =
-      "<b>网页扫码不可用的原因：</b><br>" +
-      problems.map(function(p,i){ return (i+1) + ". " + p; }).join("<br>") +
-      "<br><br><b>解决办法：</b><br>" +
-      "① 手机上：把页面放到 https 网站上（如 GitHub Pages），" +
-      "用 <b>Chrome 或系统自带浏览器</b> 打开，不要用微信内置浏览器；<br>" +
-      "② 电脑上：在文件所在目录执行 <code>python -m http.server 8000</code>，" +
-      "然后浏览器打开 <code>http://localhost:8000/</code>；<br>" +
-      "③ 直接在下方输入框手动输入条码核对。";
-    $("envWarn").innerHTML = tips;
-    $("envWarn").style.display = "block";
-  }
-})();
 
 /* ---------- 上传解析 ---------- */
 $("btnUpload").onclick = () => {
@@ -297,14 +327,22 @@ function check(code){
   if(hit >= 0){
     matchedSet.add(hit);
     logMsg("ok", ts + " ✅ 匹配成功：" + code);
-    renderTable(); updateStats(); speak("可以送");
+    renderTable(); updateStats();
+    playBeep('ok'); // 滴声
+    speak("可以送"); // 语音
     const tr = document.querySelector("tr[data-i='"+hit+"']");
     if(tr) tr.scrollIntoView({block:"center", behavior:"smooth"});
     toast("✅ 已标红：" + code);
   } else if(dup){
-    logMsg("dup", ts + " ⚠️ 重复扫描：" + code); speak("重复扫描"); toast("⚠️ 重复扫描：该条码已核对过");
+    logMsg("dup", ts + " ⚠️ 重复扫描：" + code);
+    playBeep('dup');
+    speak("重复扫描"); 
+    toast("⚠️ 重复扫描：该条码已核对过");
   } else {
-    logMsg("miss", ts + " ❌ 未在表格中找到：" + code); speak("需滞留"); toast("❌ 未找到该条码");
+    logMsg("miss", ts + " ❌ 未在表格中找到：" + code);
+    playBeep('miss');
+    speak("需滞留"); 
+    toast("❌ 未找到该条码");
   }
   if(matchedSet.size === rows.length && rows.length) speak("核对完成");
 }
@@ -314,7 +352,7 @@ $("manualInput").addEventListener("keydown", e => {
 $("btnManual").onclick = () => { check($("manualInput").value); $("manualInput").value=""; $("manualInput").focus(); };
 
 /* =========================================================
-   扫码：全力调用原生 BarcodeDetector + 4K高清流 + 连续对焦
+   扫码
    ========================================================= */
 let camStream = null, camTrack = null, camVideo = null;
 let nativeDetector = null, scanning = false, starting = false;
@@ -347,24 +385,15 @@ async function tuneTrack(track){
   if(!track) return;
   const caps = (track.getCapabilities ? track.getCapabilities() : {}) || {};
   const adv = [];
-  // 强制开启连续对焦（这是清晰的核心）
   if(Array.isArray(caps.focusMode) && caps.focusMode.includes("continuous")) adv.push({ focusMode: "continuous" });
   if(Array.isArray(caps.exposureMode) && caps.exposureMode.includes("continuous")) adv.push({ exposureMode: "continuous" });
   if(adv.length){ try{ await track.applyConstraints({ advanced: adv }); }catch(e){} }
-
-  // 强制拉高分辨率
-  try{
-    await track.applyConstraints({
-      width: { ideal: 3840 },
-      height: { ideal: 2160 }
-    });
-  }catch(e){}
+  try{ await track.applyConstraints({ width: { ideal: 3840 }, height: { ideal: 2160 } }); }catch(e){}
 }
 
-/* 核心：最高清实时扫码 */
 async function startNativeScan(){
   const det = await makeDetector();
-  if(!det) throw new Error("no-native-detector"); // 浏览器不支持原生接口，走降级方案
+  if(!det) throw new Error("no-native-detector");
 
   const container = $("reader");
   container.innerHTML = "";
@@ -380,25 +409,17 @@ async function startNativeScan(){
   overlay.className = "scan-frame";
   container.appendChild(overlay);
 
-  // 直接尝试请求4K视频流
   let stream = null, lastErr = null;
   try {
     stream = await navigator.mediaDevices.getUserMedia({
       audio: false,
-      video: {
-        facingMode: { ideal: "environment" },
-        width: { ideal: 3840 },
-        height: { ideal: 2160 },
-        frameRate: { ideal: 30 }
-      }
+      video: { facingMode: { ideal: "environment" }, width: { ideal: 3840 }, height: { ideal: 2160 }, frameRate: { ideal: 30 } }
     });
   } catch(e) {
     lastErr = e;
-    // 如果4K被拒绝，退而求其次请求1080p
     try {
       stream = await navigator.mediaDevices.getUserMedia({
-        audio: false,
-        video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } }
+        audio: false, video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } }
       });
     } catch(e2) { lastErr = e2; }
   }
@@ -408,11 +429,8 @@ async function startNativeScan(){
   camStream = stream;
   camTrack = stream.getVideoTracks()[0];
   await video.play();
-  
-  // 启动后立即强制对焦和高清
   await tuneTrack(camTrack);
 
-  // 点击画面手动对焦（如果手机支持）
   video.addEventListener("click", async ev => {
     if(!camTrack || !camTrack.getCapabilities) return;
     const caps = camTrack.getCapabilities();
@@ -438,7 +456,6 @@ async function scanLoop(){
   if(!loopBusy && camVideo.readyState >= 2 && camVideo.videoWidth > 0){
     loopBusy = true;
     try{
-      // 调用手机硬件级原生解码，速度极快
       const codes = await nativeDetector.detect(camVideo);
       if(codes && codes.length){
         for(const c of codes){ if(c.rawValue) emitCode(c.rawValue); }
@@ -446,10 +463,9 @@ async function scanLoop(){
     }catch(e){}
     loopBusy = false;
   }
-  scanTimer = setTimeout(scanLoop, 80); // 毫秒级扫描循环
+  scanTimer = setTimeout(scanLoop, 80);
 }
 
-/* 降级方案（仅当手机完全不支持原生接口，如老版本iOS） */
 async function startFallbackScan(){
   if(typeof Html5Qrcode === "undefined") throw new Error("扫码库未加载");
   fallbackMode = true;
@@ -509,6 +525,9 @@ function cameraErrText(e){
 
 $("btnCamera").onclick = async () => {
   if(scanning || starting) return;
+  // 核心修复：在用户点击按钮时，立刻激活音频上下文！
+  initAudio();
+
   if(!hasGetUserMedia()){
     popup("不支持摄像头", "请使用 Chrome 或系统自带浏览器打开，不要用微信内置浏览器。");
     return;
@@ -542,16 +561,6 @@ $("btnCamera").onclick = async () => {
 };
 
 $("btnStop").onclick = () => { stopScan(); };
-
-/* ---------- 语音播报 ---------- */
-function speak(text){
-  try{
-    speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = "zh-CN"; u.rate = 1.15; u.volume = 1;
-    speechSynthesis.speak(u);
-  }catch(e){}
-}
 
 /* ---------- 导出 ---------- */
 $("btnExport").onclick = async () => {
