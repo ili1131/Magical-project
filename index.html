@@ -10,16 +10,9 @@
   --glass-border:rgba(255,255,255,.75);
   --glass-shadow:0 8px 32px rgba(31,38,135,.16), inset 0 1px 0 rgba(255,255,255,.85);
   --glass-shadow-sm:0 4px 16px rgba(31,38,135,.12), inset 0 1px 0 rgba(255,255,255,.7);
-  --ink:#1c1c1e;
-  --ink-2:#3a3a3c;
-  --ink-3:#6c6c70;
-  --accent:#0a84ff;
-  --ok:#34c759;
-  --warn:#ff9f0a;
-  --bad:#ff3b30;
-  --radius-xl:26px;
-  --radius-lg:20px;
-  --radius-md:16px;
+  --ink:#1c1c1e;--ink-2:#3a3a3c;--ink-3:#6c6c70;
+  --accent:#0a84ff;--ok:#34c759;--warn:#ff9f0a;--bad:#ff3b30;
+  --radius-xl:26px;--radius-lg:20px;--radius-md:16px;
 }
 body{
   font-family:-apple-system,"SF Pro Text","PingFang SC","Microsoft YaHei",sans-serif;
@@ -29,9 +22,7 @@ body{
     radial-gradient(1000px 700px at 95% 8%, #ffe3ef 0%, rgba(255,227,239,0) 52%),
     radial-gradient(900px 900px at 50% 108%, #d9f4ff 0%, rgba(217,244,255,0) 58%),
     linear-gradient(180deg,#eef3fb 0%,#e9eef7 45%,#eef2f8 100%);
-  background-attachment:fixed;
-  min-height:100vh;
-  -webkit-font-smoothing:antialiased;
+  background-attachment:fixed;min-height:100vh;-webkit-font-smoothing:antialiased;
 }
 body::before{
   content:"";position:fixed;inset:-20% -10% auto -10%;height:70vh;pointer-events:none;z-index:0;
@@ -42,52 +33,35 @@ body::before{
   filter:blur(2px);
 }
 header,main,.toast,#loadStatus,#modalMask,#colPickerMask,#voiceMask,#fuzzyMask{position:relative;z-index:1}
-
 header{
-  margin:12px 12px 0;
-  padding:14px 18px;
-  display:flex;align-items:center;gap:10px;
-  border-radius:var(--radius-lg);
-  color:var(--ink);
+  margin:12px 12px 0;padding:14px 18px;display:flex;align-items:center;gap:10px;
+  border-radius:var(--radius-lg);color:var(--ink);
   background:linear-gradient(180deg,rgba(255,255,255,.78),rgba(255,255,255,.52));
-  border:1px solid var(--glass-border);
-  box-shadow:var(--glass-shadow);
-  -webkit-backdrop-filter:blur(26px) saturate(180%);
-  backdrop-filter:blur(26px) saturate(180%);
+  border:1px solid var(--glass-border);box-shadow:var(--glass-shadow);
+  -webkit-backdrop-filter:blur(26px) saturate(180%);backdrop-filter:blur(26px) saturate(180%);
 }
 header h1{font-size:18px;margin:0;flex:1;letter-spacing:.2px;font-weight:650}
 .badge{
-  background:rgba(10,132,255,.12);
-  color:var(--accent);
-  border:1px solid rgba(10,132,255,.22);
-  border-radius:20px;padding:4px 12px;font-size:12px;font-weight:600;
+  background:rgba(10,132,255,.12);color:var(--accent);
+  border:1px solid rgba(10,132,255,.22);border-radius:20px;padding:4px 12px;
+  font-size:12px;font-weight:600;
   -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
 }
 main{max-width:960px;margin:0 auto;padding:14px 12px 28px}
-
 .card{
   background:linear-gradient(180deg,rgba(255,255,255,.66),rgba(255,255,255,.44));
-  border:1px solid var(--glass-border);
-  border-radius:var(--radius-xl);
-  padding:16px;
-  margin-bottom:14px;
-  box-shadow:var(--glass-shadow);
-  -webkit-backdrop-filter:blur(26px) saturate(180%);
-  backdrop-filter:blur(26px) saturate(180%);
+  border:1px solid var(--glass-border);border-radius:var(--radius-xl);
+  padding:16px;margin-bottom:14px;box-shadow:var(--glass-shadow);
+  -webkit-backdrop-filter:blur(26px) saturate(180%);backdrop-filter:blur(26px) saturate(180%);
 }
-
 .btn{
-  position:relative;overflow:hidden;
-  display:inline-block;
-  border:1px solid var(--glass-border);
-  border-radius:var(--radius-md);
-  padding:12px 18px;
-  font-size:15px;font-weight:600;font-family:inherit;
+  position:relative;overflow:hidden;display:inline-block;
+  border:1px solid var(--glass-border);border-radius:var(--radius-md);
+  padding:12px 18px;font-size:15px;font-weight:600;font-family:inherit;
   color:var(--ink);
   background:linear-gradient(180deg,rgba(255,255,255,.82),rgba(255,255,255,.58));
   box-shadow:var(--glass-shadow-sm);
-  -webkit-backdrop-filter:blur(18px) saturate(170%);
-  backdrop-filter:blur(18px) saturate(170%);
+  -webkit-backdrop-filter:blur(18px) saturate(170%);backdrop-filter:blur(18px) saturate(170%);
   cursor:pointer;
   transition:transform .18s cubic-bezier(.2,.8,.3,1), box-shadow .22s ease, background .22s ease, opacity .2s ease;
   user-select:none;
@@ -102,7 +76,6 @@ main{max-width:960px;margin:0 auto;padding:14px 12px 28px}
 .btn:active::after{width:240%;height:240%;opacity:.85;transition:width .45s ease,height .45s ease,opacity .1s ease}
 .btn:disabled{opacity:.42;cursor:not-allowed;transform:none;box-shadow:var(--glass-shadow-sm)}
 .btn-sm{padding:7px 14px;font-size:13px;border-radius:12px}
-
 .btn-primary,.btn-success,.btn-danger,.btn-secondary,.btn-warning,.btn-info,.btn-dark{
   color:var(--ink);
   background:linear-gradient(180deg,rgba(255,255,255,.82),rgba(255,255,255,.58));
@@ -110,46 +83,37 @@ main{max-width:960px;margin:0 auto;padding:14px 12px 28px}
 }
 .btn-primary,.btn-success{
   background:linear-gradient(180deg,rgba(255,255,255,.9),rgba(214,232,255,.66));
-  border-color:rgba(255,255,255,.9);
-  color:#0a4fa8;
+  border-color:rgba(255,255,255,.9);color:#0a4fa8;
 }
 .btn-danger{color:#a3231b;background:linear-gradient(180deg,rgba(255,255,255,.88),rgba(255,224,222,.6));border-color:rgba(255,255,255,.88)}
 .btn-warning{color:#8a5400;background:linear-gradient(180deg,rgba(255,255,255,.88),rgba(255,236,204,.6));border-color:rgba(255,255,255,.88)}
-
 .btn-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .btn-grid .btn{margin:0;width:100%;padding:15px 8px;font-size:14px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2;border-radius:var(--radius-md)}
 .btn-grid .btn.span-2{grid-column:1/-1}
-
 #restoreBanner{
   display:none;align-items:center;gap:8px;flex-wrap:wrap;
   background:linear-gradient(180deg,rgba(255,255,255,.75),rgba(226,255,236,.6));
-  border:1px solid var(--glass-border);
-  border-radius:var(--radius-lg);
+  border:1px solid var(--glass-border);border-radius:var(--radius-lg);
   padding:12px 14px;font-size:13px;line-height:1.6;margin-bottom:14px;color:#0d5c34;
   box-shadow:var(--glass-shadow-sm);
   -webkit-backdrop-filter:blur(22px) saturate(170%);backdrop-filter:blur(22px) saturate(170%);
 }
 #restoreBanner .spacer{flex:1}
-
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
 .stat{
   background:linear-gradient(180deg,rgba(255,255,255,.72),rgba(255,255,255,.48));
-  border:1px solid var(--glass-border);
-  border-radius:var(--radius-md);
-  padding:12px 10px;text-align:center;
-  box-shadow:var(--glass-shadow-sm);
+  border:1px solid var(--glass-border);border-radius:var(--radius-md);
+  padding:12px 10px;text-align:center;box-shadow:var(--glass-shadow-sm);
   -webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);
 }
 .stat b{display:block;font-size:22px;font-weight:700;letter-spacing:.5px}
 .stat[style*="198754"]{color:var(--ok)!important}
 .stat[style*="dc3545"]{color:var(--bad)!important}
-
 #readerWrap{display:none;margin-bottom:14px}
 #reader{
   position:relative;width:100%;max-width:480px;margin:0 auto;
   border-radius:var(--radius-xl);overflow:hidden;background:#000;
-  border:1px solid var(--glass-border);
-  box-shadow:var(--glass-shadow);
+  border:1px solid var(--glass-border);box-shadow:var(--glass-shadow);
 }
 #reader video{width:100%;display:block;background:#000;object-fit:cover}
 .scan-frame{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:82%;height:40%;border:2px solid rgba(255,80,80,.9);border-radius:14px;box-shadow:0 0 0 9999px rgba(0,0,0,.2);pointer-events:none;z-index:10}
@@ -167,110 +131,52 @@ main{max-width:960px;margin:0 auto;padding:14px 12px 28px}
 #focusStepBtnGroup{display:none;gap:8px;align-items:center}
 #focusStepBtnGroup button{flex:1;padding:7px;font-size:12px;font-weight:700;border:1px solid rgba(255,255,255,.5);border-radius:10px;background:rgba(255,255,255,.35);color:#fff;cursor:pointer;-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
 #focusStepBtnGroup button:active{background:rgba(255,255,255,.55)}
-
 #logCard{display:none}
 .log{max-height:180px;overflow-y:auto;font-size:13px}
 .log .ok{color:var(--ok)}
 .log .dup{color:var(--warn)}
 .log .miss{color:var(--bad)}
-
 table{border-collapse:collapse;font-size:13px;width:max-content;min-width:100%}
 th,td{border:1px solid #e3e7ee;padding:7px 8px;text-align:left;white-space:nowrap}
 th{background:#eef2f8;position:sticky;top:0;z-index:1}
 td.matched{background:#ffe3e3 !important;color:#b02a37;font-weight:700}
-.table-wrap{
-  max-height:50vh;overflow:auto;border-radius:14px;
-  -webkit-overflow-scrolling:touch;touch-action:pan-x pan-y;
-  background:rgba(255,255,255,.86);
-  border:1px solid rgba(255,255,255,.9);
-}
+.table-wrap{max-height:50vh;overflow:auto;border-radius:14px;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y;background:rgba(255,255,255,.86);border:1px solid rgba(255,255,255,.9)}
 .hint{color:var(--ink-3);font-size:13px;line-height:1.6}
 #fileName{font-size:13px;color:var(--accent);margin-left:6px;word-break:break-all}
 #uploadBusy{display:none;margin-left:8px;font-size:13px;color:var(--accent)}
-
-.toast{
-  position:fixed;left:50%;bottom:60px;transform:translateX(-50%);
-  background:linear-gradient(180deg,rgba(255,255,255,.82),rgba(255,255,255,.62));
-  color:var(--ink);
-  padding:14px 22px;border-radius:22px;font-size:15px;display:none;z-index:99;
-  max-width:90vw;text-align:center;line-height:1.6;word-break:break-word;
-  border:1px solid var(--glass-border);
-  box-shadow:0 12px 40px rgba(31,38,135,.22), inset 0 1px 0 rgba(255,255,255,.9);
-  -webkit-backdrop-filter:blur(28px) saturate(180%);backdrop-filter:blur(28px) saturate(180%);
-}
+.toast{position:fixed;left:50%;bottom:60px;transform:translateX(-50%);background:linear-gradient(180deg,rgba(255,255,255,.82),rgba(255,255,255,.62));color:var(--ink);padding:14px 22px;border-radius:22px;font-size:15px;display:none;z-index:99;max-width:90vw;text-align:center;line-height:1.6;word-break:break-word;border:1px solid var(--glass-border);box-shadow:0 12px 40px rgba(31,38,135,.22), inset 0 1px 0 rgba(255,255,255,.9);-webkit-backdrop-filter:blur(28px) saturate(180%);backdrop-filter:blur(28px) saturate(180%)}
 .toast .head{font-size:16px;font-weight:700}
 .toast .info{display:block;font-size:13px;font-weight:500;color:#8a5a00;margin-top:6px}
-
-#loadStatus{
-  position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
-  z-index:100;font-size:15px;color:var(--ink-2);
-  background:linear-gradient(180deg,rgba(255,255,255,.72),rgba(255,255,255,.55));
-  -webkit-backdrop-filter:blur(30px) saturate(180%);backdrop-filter:blur(30px) saturate(180%);
-}
+#loadStatus{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:100;font-size:15px;color:var(--ink-2);background:linear-gradient(180deg,rgba(255,255,255,.72),rgba(255,255,255,.55));-webkit-backdrop-filter:blur(30px) saturate(180%);backdrop-filter:blur(30px) saturate(180%)}
 .spinner{width:38px;height:38px;border:4px solid rgba(10,132,255,.18);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 #loadRetry{display:none}
-
 #modalMask{position:fixed;inset:0;background:rgba(20,24,38,.28);display:none;align-items:center;justify-content:center;z-index:200;padding:18px;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
 #modalMask.show{display:flex}
-#modal{
-  background:linear-gradient(180deg,rgba(255,255,255,.86),rgba(255,255,255,.7));
-  border:1px solid var(--glass-border);
-  border-radius:var(--radius-xl);max-width:420px;width:100%;padding:22px;
-  box-shadow:0 20px 60px rgba(31,38,135,.28), inset 0 1px 0 rgba(255,255,255,.95);
-  -webkit-backdrop-filter:blur(30px) saturate(180%);backdrop-filter:blur(30px) saturate(180%);
-}
+#modal{background:linear-gradient(180deg,rgba(255,255,255,.86),rgba(255,255,255,.7));border:1px solid var(--glass-border);border-radius:var(--radius-xl);max-width:420px;width:100%;padding:22px;box-shadow:0 20px 60px rgba(31,38,135,.28), inset 0 1px 0 rgba(255,255,255,.95);-webkit-backdrop-filter:blur(30px) saturate(180%);backdrop-filter:blur(30px) saturate(180%)}
 #modal h3{margin:0 0 10px;font-size:17px;color:var(--bad)}
 #modal .mbody{font-size:14px;line-height:1.7;color:var(--ink-2);white-space:pre-wrap;word-break:break-word}
 #modal .mfoot{text-align:right;margin-top:16px}
-
 #colPickerMask{position:fixed;inset:0;background:rgba(20,24,38,.28);display:none;align-items:center;justify-content:center;z-index:300;padding:18px;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
 #colPickerMask.show{display:flex}
-#colPicker{
-  background:linear-gradient(180deg,rgba(255,255,255,.88),rgba(255,255,255,.72));
-  border:1px solid var(--glass-border);
-  border-radius:var(--radius-xl);max-width:480px;width:100%;padding:22px;
-  box-shadow:0 20px 60px rgba(31,38,135,.28), inset 0 1px 0 rgba(255,255,255,.95);
-  max-height:82vh;display:flex;flex-direction:column;
-  -webkit-backdrop-filter:blur(30px) saturate(180%);backdrop-filter:blur(30px) saturate(180%);
-}
+#colPicker{background:linear-gradient(180deg,rgba(255,255,255,.88),rgba(255,255,255,.72));border:1px solid var(--glass-border);border-radius:var(--radius-xl);max-width:480px;width:100%;padding:22px;box-shadow:0 20px 60px rgba(31,38,135,.28), inset 0 1px 0 rgba(255,255,255,.95);max-height:82vh;display:flex;flex-direction:column;-webkit-backdrop-filter:blur(30px) saturate(180%);backdrop-filter:blur(30px) saturate(180%)}
 #colPicker h3{margin:0 0 6px;font-size:17px;color:var(--accent)}
 .colPickerHint{font-size:12px;color:var(--ink-3);margin-bottom:12px}
 #colPickerList{overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch}
-.colPickBtn{
-  display:block;width:100%;text-align:left;padding:13px 15px;margin-bottom:8px;
-  border:1px solid var(--glass-border);border-radius:var(--radius-md);
-  background:linear-gradient(180deg,rgba(255,255,255,.75),rgba(255,255,255,.55));
-  font-size:14px;font-weight:600;cursor:pointer;color:var(--ink);font-family:inherit;
-  box-shadow:var(--glass-shadow-sm);
-  -webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);
-  transition:transform .18s ease,background .2s ease;
-}
+.colPickBtn{display:block;width:100%;text-align:left;padding:13px 15px;margin-bottom:8px;border:1px solid var(--glass-border);border-radius:var(--radius-md);background:linear-gradient(180deg,rgba(255,255,255,.75),rgba(255,255,255,.55));font-size:14px;font-weight:600;cursor:pointer;color:var(--ink);font-family:inherit;box-shadow:var(--glass-shadow-sm);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);transition:transform .18s ease,background .2s ease}
 .colPickBtn:active{transform:scale(.98);background:rgba(255,255,255,.85)}
 .colPickBtn.current{border-color:rgba(10,132,255,.5);background:linear-gradient(180deg,rgba(230,242,255,.9),rgba(214,232,255,.7))}
 .colPickBtn .idx{color:var(--accent);margin-right:8px;font-size:12px;font-weight:700}
 .colPickBtn.allBtn{background:linear-gradient(180deg,rgba(255,255,255,.78),rgba(255,244,225,.6))}
 .colPickBtn.allBtn.current{border-color:rgba(255,159,10,.5);background:linear-gradient(180deg,rgba(255,246,232,.95),rgba(255,232,200,.75))}
 .colPickBtn.allBtn .idx{color:var(--warn)}
-
 #voiceMask{position:fixed;inset:0;background:rgba(20,24,38,.3);display:none;align-items:center;justify-content:center;z-index:400;padding:18px;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
 #voiceMask.show{display:flex}
-#voicePanel{
-  background:linear-gradient(180deg,rgba(255,255,255,.88),rgba(255,255,255,.72));
-  border:1px solid var(--glass-border);
-  border-radius:var(--radius-xl);max-width:440px;width:100%;padding:22px;
-  box-shadow:0 20px 60px rgba(31,38,135,.3), inset 0 1px 0 rgba(255,255,255,.95);
-  -webkit-backdrop-filter:blur(30px) saturate(180%);backdrop-filter:blur(30px) saturate(180%);
-}
+#voicePanel{background:linear-gradient(180deg,rgba(255,255,255,.88),rgba(255,255,255,.72));border:1px solid var(--glass-border);border-radius:var(--radius-xl);max-width:440px;width:100%;padding:22px;box-shadow:0 20px 60px rgba(31,38,135,.3), inset 0 1px 0 rgba(255,255,255,.95);-webkit-backdrop-filter:blur(30px) saturate(180%);backdrop-filter:blur(30px) saturate(180%)}
 #voicePanel h3{margin:0 0 8px;font-size:17px;color:var(--accent)}
 .voiceHint{font-size:12px;color:var(--ink-3);line-height:1.7;margin-bottom:12px}
 #voiceStatus{font-size:13px;color:var(--accent);font-weight:700;margin-bottom:10px;text-align:center;padding:9px;background:rgba(10,132,255,.08);border-radius:12px;border:1px solid rgba(10,132,255,.15)}
-.voiceBlock{
-  background:linear-gradient(180deg,rgba(255,255,255,.72),rgba(255,255,255,.5));
-  border:1px solid var(--glass-border);
-  border-radius:14px;padding:11px 13px;margin-bottom:8px;min-height:46px;
-  -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
-}
+.voiceBlock{background:linear-gradient(180deg,rgba(255,255,255,.72),rgba(255,255,255,.5));border:1px solid var(--glass-border);border-radius:14px;padding:11px 13px;margin-bottom:8px;min-height:46px;-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
 .voiceBlock .label{font-size:11px;color:var(--ink-3);display:block;margin-bottom:4px;font-weight:600}
 .voiceBlock .content{font-size:14px;color:var(--ink-2);word-break:break-all;line-height:1.5}
 .voiceBlock.norm{background:linear-gradient(180deg,rgba(240,255,245,.85),rgba(220,250,232,.6));border-color:rgba(52,199,89,.25)}
@@ -279,31 +185,15 @@ td.matched{background:#ffe3e3 !important;color:#b02a37;font-weight:700}
 .voiceActions .btn{flex:1;padding:11px 6px;font-size:13px}
 #voiceHoldBtn{touch-action:none;user-select:none;-webkit-user-select:none}
 #voiceHoldBtn.holding{background:linear-gradient(180deg,rgba(255,240,220,.95),rgba(255,215,180,.8));color:#8a5400;transform:scale(.97);box-shadow:0 2px 10px rgba(31,38,135,.18), inset 0 1px 0 rgba(255,255,255,.85)}
-
 #fuzzyMask{position:fixed;inset:0;background:rgba(20,24,38,.3);display:none;align-items:center;justify-content:center;z-index:500;padding:18px;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
 #fuzzyMask.show{display:flex}
-#fuzzyPanel{
-  background:linear-gradient(180deg,rgba(255,255,255,.88),rgba(255,255,255,.72));
-  border:1px solid var(--glass-border);
-  border-radius:var(--radius-xl);max-width:480px;width:100%;padding:22px;
-  box-shadow:0 20px 60px rgba(31,38,135,.32), inset 0 1px 0 rgba(255,255,255,.95);
-  max-height:88vh;display:flex;flex-direction:column;
-  -webkit-backdrop-filter:blur(30px) saturate(180%);backdrop-filter:blur(30px) saturate(180%);
-}
+#fuzzyPanel{background:linear-gradient(180deg,rgba(255,255,255,.88),rgba(255,255,255,.72));border:1px solid var(--glass-border);border-radius:var(--radius-xl);max-width:480px;width:100%;padding:22px;box-shadow:0 20px 60px rgba(31,38,135,.32), inset 0 1px 0 rgba(255,255,255,.95);max-height:88vh;display:flex;flex-direction:column;-webkit-backdrop-filter:blur(30px) saturate(180%);backdrop-filter:blur(30px) saturate(180%)}
 #fuzzyPanel h3{margin:0 0 8px;font-size:17px;color:var(--accent)}
 .fuzzyHint{font-size:12px;color:var(--ink-3);line-height:1.7;margin-bottom:10px}
 .fuzzyHint strong{color:var(--accent)}
 #fuzzyInput{font-family:monospace;background:rgba(10,132,255,.08);padding:2px 6px;border-radius:6px;color:#b02a37;font-weight:700;word-break:break-all}
 #fuzzyList{overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch;margin-bottom:10px}
-.fuzzyItem{
-  display:block;width:100%;text-align:left;padding:13px 15px;margin-bottom:8px;
-  border:1px solid var(--glass-border);border-radius:var(--radius-md);
-  background:linear-gradient(180deg,rgba(255,255,255,.75),rgba(255,255,255,.55));
-  cursor:pointer;font-family:inherit;
-  box-shadow:var(--glass-shadow-sm);
-  -webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);
-  transition:transform .18s ease;
-}
+.fuzzyItem{display:block;width:100%;text-align:left;padding:13px 15px;margin-bottom:8px;border:1px solid var(--glass-border);border-radius:var(--radius-md);background:linear-gradient(180deg,rgba(255,255,255,.75),rgba(255,255,255,.55));cursor:pointer;font-family:inherit;box-shadow:var(--glass-shadow-sm);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);transition:transform .18s ease}
 .fuzzyItem:active{transform:scale(.985)}
 .fuzzyItem.selected{border-color:rgba(10,132,255,.55);background:linear-gradient(180deg,rgba(230,242,255,.95),rgba(212,231,255,.75))}
 .fuzzyItemText{font-size:16px;font-weight:700;color:var(--ink);word-break:break-all;margin-bottom:4px;font-family:monospace}
@@ -435,7 +325,6 @@ const IS_IOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==
 
 function showDataButtons(show){document.querySelectorAll(".need-data").forEach(el=>{el.style.display=show?"":"none"})}
 
-/* IndexedDB */
 const DB_NAME='philips_check_db',DB_VERSION=1,DB_STORE='table_data';
 const KEY_MATCHED_CELLS='philips_check_matched_cells_v1',KEY_MATCHED_OLD='philips_check_matched_v1';
 let _dbPromise=null;
@@ -454,16 +343,34 @@ function loadMatchedCells(){try{const s=localStorage.getItem(KEY_MATCHED_CELLS);
 function clearMatched(){try{localStorage.removeItem(KEY_MATCHED_CELLS);localStorage.removeItem(KEY_MATCHED_OLD)}catch(e){}}
 function rebuildMatchedSetFromCells(){matchedSet=new Set();matchedCells.forEach(k=>{const r=parseInt(String(k).split("-")[0],10);if(!isNaN(r))matchedSet.add(r)});lastHitRow=matchedSet.size?Math.max.apply(null,Array.from(matchedSet)):-1}
 
-/* 振动、音频 */
 function vibrate(t){if(!navigator.vibrate)return;try{if(t==='ok')navigator.vibrate(60);else if(t==='dup')navigator.vibrate([80,60,80]);else if(t==='miss')navigator.vibrate([300,100,300,100,300])}catch(e){}}
 let audioCtx=null;
 function ensureCtx(){if(!audioCtx){const AC=window.AudioContext||window.webkitAudioContext;if(AC)audioCtx=new AC()}return audioCtx}
-function playTone(ctx,freq,dur,vol,st){try{const o=ctx.createOscillator(),g=ctx.createGain();o.type='sine';o.frequency.value=freq;o.connect(g);g.connect(ctx.destination);const v=Math.min(vol,1);g.gain.setValueAtTime(v,st);g.gain.exponentialRampToValueAtTime(0.001,st+dur/1000);o.start(st);o.stop(st+dur/1000)}catch(e){}}
+
+/* ★ 音效增强版：方波主音 + 双倍频泛音，音量更响 */
+function playTone(ctx,freq,dur,vol,st){
+  try{
+    const o1=ctx.createOscillator(),g=ctx.createGain();
+    o1.type='square';
+    o1.frequency.value=freq;
+    const o2=ctx.createOscillator(),g2=ctx.createGain();
+    o2.type='sine';
+    o2.frequency.value=freq*2;
+    g2.gain.value=0.35;
+    o1.connect(g);o2.connect(g2);g2.connect(g);g.connect(ctx.destination);
+    const v=Math.min(vol,1);
+    g.gain.setValueAtTime(0.0001,st);
+    g.gain.exponentialRampToValueAtTime(v,st+0.008);
+    g.gain.setValueAtTime(v,st+dur/1000*0.65);
+    g.gain.exponentialRampToValueAtTime(0.0001,st+dur/1000);
+    o1.start(st);o1.stop(st+dur/1000+0.02);
+    o2.start(st);o2.stop(st+dur/1000+0.02);
+  }catch(e){}
+}
 function initAudioAndUnlock(){const ctx=ensureCtx();if(!ctx)return;const fire=()=>{playTone(ctx,1500,130,1,ctx.currentTime)};if(ctx.state==='suspended'){ctx.resume().then(fire).catch(fire)}else{fire()}}
-function playBeep(t){const ctx=ensureCtx();if(!ctx)return;const fire=()=>{const now=ctx.currentTime;if(t==='ok'){playTone(ctx,1500,120,1,now);playTone(ctx,2000,130,1,now+0.14)}else if(t==='dup'){playTone(ctx,1000,60,1,now);playTone(ctx,1000,60,1,now+0.1);playTone(ctx,1000,60,1,now+0.2)}else if(t==='miss'){playTone(ctx,400,500,1,now)}};if(ctx.state==='suspended'){ctx.resume().then(fire).catch(fire)}else{fire()}}
+function playBeep(t){const ctx=ensureCtx();if(!ctx)return;const fire=()=>{const now=ctx.currentTime;if(t==='ok'){playTone(ctx,1500,140,1,now);playTone(ctx,2000,150,1,now+0.15)}else if(t==='dup'){playTone(ctx,1000,80,1,now);playTone(ctx,1000,80,1,now+0.12);playTone(ctx,1000,80,1,now+0.24)}else if(t==='miss'){playTone(ctx,400,600,1,now)}};if(ctx.state==='suspended'){ctx.resume().then(fire).catch(fire)}else{fire()}}
 function speak(text){try{if(!window.speechSynthesis)return;speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.lang="zh-CN";u.rate=1.15;u.volume=1;speechSynthesis.speak(u)}catch(e){}}
 
-/* UI */
 function toast(head,info,ms){const t=$("toast");let h='<div class="head">'+head+'</div>';if(info)h+='<span class="info">'+info+'</span>';t.innerHTML=h;t.style.display="block";clearTimeout(t._tm);t._tm=setTimeout(()=>t.style.display="none",ms||2600)}
 function logMsg(cls,msg){const d=document.createElement("div");d.className=cls;d.textContent=msg;$("log").prepend(d);$("logCard").style.display="block"}
 function popup(title,bodyHtml){$("modalTitle").textContent=title;$("modalBody").innerHTML=bodyHtml;$("modalMask").classList.add("show")}
@@ -478,7 +385,6 @@ const allBtn=document.createElement("button");allBtn.className="colPickBtn allBt
 headers.forEach((h,i)=>{const btn=document.createElement("button");btn.className="colPickBtn"+(i===currentIdx?" current":"");btn.innerHTML='<span class="idx">第'+(i+1)+'列</span>'+esc(h||"(空标题)");btn.onclick=()=>{mask.classList.remove("show");callback(i)};list.appendChild(btn)});
 mask.classList.add("show")}
 
-/* 上传 */
 $("btnUpload").onclick=()=>{if(hasSavedData){if(!confirm("检测到上次保存的核对数据。\n\n上传新表格会覆盖旧数据，是否继续？\n\n（如果想保留旧数据，点取消）"))return}pickFile()};
 function pickFile(){const inp=document.createElement("input");inp.type="file";inp.accept=".xlsx,.xls,.csv";inp.onchange=async e=>{const f=e.target.files[0];if(!f)return;$("fileName").textContent=f.name;fileBase=f.name.replace(/\.[^.]+$/,"");$("uploadBusy").style.display="inline";$("btnUpload").disabled=true;
 try{if(typeof XLSX==="undefined")throw new Error("XLSX 组件未加载，请检查网络后重试");
@@ -523,7 +429,6 @@ toast("✅ 已核对 · 可以配送",info);
 if(matchedSet.size===rows.length&&rows.length)speak("核对完成");
 return true}
 
-/* 精确匹配（摄像头） */
 function check(code){code=String(code||"").trim();if(!code)return;
 if(matchColIdx===null||matchColIdx===undefined){toast("提示","请先选择核对模式");return}
 const positions=codeIndex.get(code);let hit=null,dup=false;
@@ -533,7 +438,6 @@ if(hit){markMatched(hit.r,hit.c,code,"")}
 else if(dup){logMsg("dup",ts+" ⚠️ 重复扫描："+code);addLog(code,"重复","该条码已核对过");playBeep('dup');vibrate('dup');speak("重复扫描");toast("⚠️ 重复扫描","该条码已核对过："+code)}
 else{logMsg("miss",ts+" ❌ 未在表格中找到："+code);addLog(code,"失败","未在表格中找到");playBeep('miss');vibrate('miss');speak("不可配送，需滞留");toast("❌ 不可配送，需滞留","未在表格中找到："+code)}}
 
-/* 模糊匹配（语音） */
 function basicNormalize(s){if(!s)return"";let r=String(s);
 r=r.replace(/[\uFF01-\uFF5E]/g,ch=>String.fromCharCode(ch.charCodeAt(0)-0xFEE0));
 r=r.replace(/[\s\u3000]+/g,"");
@@ -560,19 +464,13 @@ if(matchColIdx===-1){rows.forEach((row,i)=>{row.forEach((val,j)=>{evalCell(i,j,v
 else if(matchColIdx>=0){rows.forEach((row,i)=>{evalCell(i,matchColIdx,row[matchColIdx])})}
 candidates.sort((a,b)=>b.score-a.score);return candidates.slice(0,5)}
 
-/* ============ 语音识别 —— 兼容性优化版 ============ */
 let voiceRec=null,voiceRawText="",voiceNormalizedText="",voiceActive=false;
 let voiceHolding=false;
 let voiceStream=null;
 let voiceEndTimer=null;
 
 function getSpeechRecognitionClass(){return window.SpeechRecognition||window.webkitSpeechRecognition||null}
-
-function isSpeechRecognitionSupported(){
-  const SR=getSpeechRecognitionClass();
-  if(!SR)return false;
-  return true;
-}
+function isSpeechRecognitionSupported(){const SR=getSpeechRecognitionClass();if(!SR)return false;return true}
 
 async function warmupMic(){
   if(voiceStream)return true;
@@ -581,10 +479,7 @@ async function warmupMic(){
     voiceStream.getTracks().forEach(t=>t.stop());
     voiceStream=null;
     return true;
-  }catch(e){
-    console.warn("[语音] 预热麦克风失败:",e);
-    return false;
-  }
+  }catch(e){console.warn("[语音] 预热麦克风失败:",e);return false}
 }
 
 function openVoicePanel(){
@@ -606,14 +501,10 @@ function openVoicePanel(){
 function startHoldVoice(){
   if(voiceHolding)return;
   const SR=getSpeechRecognitionClass();
-  if(!SR){
-    $("voiceStatus").textContent="❌ 当前浏览器不支持语音识别";
-    return;
-  }
+  if(!SR){$("voiceStatus").textContent="❌ 当前浏览器不支持语音识别";return}
   voiceHolding=true;
   $("voiceHoldBtn").classList.add("holding");
   $("voiceStatus").textContent="🎤 正在聆听… 松开结束";
-
   clearTimeout(voiceEndTimer);voiceEndTimer=null;
 
   try{
@@ -627,8 +518,7 @@ function startHoldVoice(){
       let interim="";
       for(let i=e.resultIndex;i<e.results.length;i++){
         const t=e.results[i][0].transcript;
-        if(e.results[i].isFinal){voiceRawText+=t}
-        else{interim+=t}
+        if(e.results[i].isFinal){voiceRawText+=t}else{interim+=t}
       }
       const displayRaw=voiceRawText+interim;
       const norm=basicNormalize(displayRaw);
@@ -640,30 +530,19 @@ function startHoldVoice(){
     voiceRec.onerror=(e)=>{
       console.warn("[语音] 错误:",e.error);
       if(e.error==='aborted')return;
-      if(e.error==='not-allowed'||e.error==='service-not-allowed'){
-        $("voiceStatus").textContent="❌ 麦克风权限被拒绝，请在浏览器设置中允许";
-      }else if(e.error==='no-speech'){
-        $("voiceStatus").textContent="⚠️ 没有检测到语音，请再按住试一次";
-      }else if(e.error==='network'){
-        $("voiceStatus").textContent="❌ 网络错误，请检查网络后重试";
-      }else{
-        $("voiceStatus").textContent="❌ 识别出错："+e.error;
-      }
+      if(e.error==='not-allowed'||e.error==='service-not-allowed'){$("voiceStatus").textContent="❌ 麦克风权限被拒绝，请在浏览器设置中允许"}
+      else if(e.error==='no-speech'){$("voiceStatus").textContent="⚠️ 没有检测到语音，请再按住试一次"}
+      else if(e.error==='network'){$("voiceStatus").textContent="❌ 网络错误，请检查网络后重试"}
+      else{$("voiceStatus").textContent="❌ 识别出错："+e.error}
     };
 
     voiceRec.onend=()=>{
-      voiceActive=false;
-      voiceHolding=false;
+      voiceActive=false;voiceHolding=false;
       $("voiceHoldBtn").classList.remove("holding");
       const norm=basicNormalize(voiceRawText);
       voiceNormalizedText=norm;
-      if(norm){
-        $("voiceStatus").textContent="✅ 识别完成，请点「查找匹配」";
-        $("voiceConfirmBtn").disabled=false;
-      }else{
-        $("voiceStatus").textContent="⚠️ 没有识别到内容，请再按住试一次";
-        $("voiceConfirmBtn").disabled=true;
-      }
+      if(norm){$("voiceStatus").textContent="✅ 识别完成，请点「查找匹配」";$("voiceConfirmBtn").disabled=false}
+      else{$("voiceStatus").textContent="⚠️ 没有识别到内容，请再按住试一次";$("voiceConfirmBtn").disabled=true}
     };
 
     voiceRec.start();
@@ -682,22 +561,17 @@ function stopHoldVoice(){
   $("voiceHoldBtn").classList.remove("holding");
   $("voiceStatus").textContent="⏳ 正在识别…";
   clearTimeout(voiceEndTimer);
-  voiceEndTimer=setTimeout(()=>{
-    if(voiceRec){try{voiceRec.stop()}catch(e){}}
-  },300);
+  voiceEndTimer=setTimeout(()=>{if(voiceRec){try{voiceRec.stop()}catch(e){}}},300);
 }
 
 function stopVoiceRecognition(){
   voiceHolding=false;voiceActive=false;
   clearTimeout(voiceEndTimer);voiceEndTimer=null;
   $("voiceHoldBtn").classList.remove("holding");
-  if(voiceRec){try{voiceRec.stop()}catch(e){}try{voiceRec.abort()}catch(e){}voiceRec=null;}
+  if(voiceRec){try{voiceRec.stop()}catch(e){}try{voiceRec.abort()}catch(e){}voiceRec=null}
 }
 
-function closeVoicePanel(){
-  stopVoiceRecognition();
-  $("voiceMask").classList.remove("show");
-}
+function closeVoicePanel(){stopVoiceRecognition();$("voiceMask").classList.remove("show")}
 
 $("btnVoice").onclick=()=>{initAudioAndUnlock();openVoicePanel()};
 $("voiceCancelBtn").onclick=()=>{closeVoicePanel()};
@@ -721,9 +595,7 @@ $("voiceConfirmBtn").onclick=()=>{
 };
 
 document.addEventListener("visibilitychange",function(){if(document.hidden){closeVoicePanel()}});
-/* ============ 语音识别 结束 ============ */
 
-/* 模糊匹配弹窗 */
 let fuzzyCandidates=[],fuzzySelectedIdx=-1;
 function showFuzzyMatch(input){const candidates=fuzzyFindCandidates(input);fuzzyCandidates=candidates;fuzzySelectedIdx=candidates.length>0?0:-1;
 $("fuzzyInput").textContent=input;const list=$("fuzzyList");list.innerHTML="";
@@ -741,7 +613,6 @@ $("fuzzyRetryBtn").onclick=()=>{$("fuzzyMask").classList.remove("show");setTimeo
 $("fuzzyConfirmBtn").onclick=()=>{if(fuzzySelectedIdx<0||!fuzzyCandidates[fuzzySelectedIdx]){toast("提示","请先选择一个匹配项");return}
 const sel=fuzzyCandidates[fuzzySelectedIdx];$("fuzzyMask").classList.remove("show");markMatched(sel.r,sel.c,sel.text,"语音模糊匹配")};
 
-/* 摄像头 */
 function showCamStatus(track){const el=$("camStatus");if(!el||!track)return;const caps=(track.getCapabilities?track.getCapabilities():{})||{};const parts=[];
 if(Array.isArray(caps.focusMode)&&caps.focusMode.length){const f=caps.focusMode;if(f.includes('continuous'))parts.push('自动对焦✓');else if(f.includes('single-shot'))parts.push('单次对焦');else parts.push('对焦: '+f.join('/'))}else{parts.push('对焦: 不支持')}
 if(caps.zoom&&caps.zoom.max>caps.zoom.min){parts.push('变焦 '+caps.zoom.min.toFixed(1)+'-'+caps.zoom.max.toFixed(1))}
@@ -836,7 +707,6 @@ finally{starting=false;$("btnCamera").disabled=false}};
 
 $("btnStop").onclick=function(){stopScan()};
 
-/* 导出 */
 function getTodayStr(){const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,'0')+"-"+String(d.getDate()).padStart(2,'0')}
 async function buildAndShareExcel(rowIdxList,outBaseName){if(typeof ExcelJS==="undefined"){toast("导出组件未加载完成","请稍后再试");return}if(!rowIdxList.length){toast("提示","没有可导出的数据");return}
 try{const wb=new ExcelJS.Workbook();const ws=wb.addWorksheet(sheetName||"核对结果");ws.addRow(headers).font={bold:true};
@@ -862,13 +732,11 @@ if(navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.s
 const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=outName;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),5000);toast("已下载",outName)}
 catch(err){toast("导出失败",err.message)}};
 
-/* 清除 */
 $("btnClearStorage").onclick=function(){if(!confirm("确定要清除已保存的表格、核对进度和运行日志吗？此操作不可恢复。"))return;
 hasSavedData=false;headers=[];rows=[];matchColIdx=null;matchedSet=new Set();matchedCells=new Set();codeIndex=new Map();checkLog=[];lastHitRow=-1;fileBase="核对结果";
 $("restoreBanner").style.display="none";$("fileName").textContent="";$("colBadge").style.display="none";showDataButtons(false);$("statCard").style.display="none";$("tableCard").style.display="none";$("logCard").style.display="none";$("readerWrap").style.display="none";$("grid").innerHTML="";$("log").innerHTML="";$("btnCamera").style.display="none";$("btnStop").style.display="none";$("uploadBusy").style.display="none";$("btnUpload").disabled=false;$("controlPanel").style.display="none";closeVoicePanel();$("fuzzyMask").classList.remove("show");
 try{deleteTableData()}catch(e){}try{deleteLogFromDB()}catch(e){}clearMatched();toast("已清除","保存的数据已删除")};
 
-/* 恢复 */
 async function tryRestore(){try{checkLog=await loadLogFromDB();
 const data=await loadTableData();if(!data||!data.rows||!data.rows.length){hasSavedData=false;return}
 hasSavedData=true;headers=data.headers||[];rows=data.rows||[];matchColIdx=(data.matchColIdx===undefined)?null:data.matchColIdx;sheetName=data.sheetName||"核对结果";fileBase=data.fileBase||"核对结果";
