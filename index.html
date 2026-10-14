@@ -19,6 +19,7 @@
   .btn-secondary { background: #6c757d; color: #fff; }
   .btn-warning { background: #fd7e14; color: #fff; }
   .btn-info { background: #0dcaf0; color: #05323a; }
+  .btn-dark { background: #343a40; color: #fff; }
   .btn:disabled { opacity: .45; cursor: not-allowed; }
   .btn-sm { padding: 6px 12px; font-size: 13px; }
 
@@ -36,7 +37,6 @@
     gap: 8px;
     flex-wrap: wrap;
   }
-  #restoreBanner b { color: #0a3622; }
   #restoreBanner .spacer { flex: 1; }
 
   .stats { display: flex; gap: 10px; flex-wrap: wrap; }
@@ -104,22 +104,15 @@
   </div>
 
   <div class="card">
-    <button class="btn btn-primary" id="btnUpload" disabled>① 上传 Excel 表格</button>
+    <button class="btn btn-primary" id="btnUpload" disabled>Excel</button>
     <span id="fileName"></span>
     <span id="uploadBusy">⏳ 正在解析表格…</span>
-    <div class="hint" style="margin-top:8px">
-      支持 .xlsx / .xls / .csv。系统会自动查找标题为 <b>RML/RMD</b> 的列作为核对列。<br>
-      💾 核对进度会自动保存到浏览器，关闭页面后重新打开可继续。
-    </div>
   </div>
 
   <div class="card" id="scanCard" style="display:none">
-    <button class="btn btn-success" id="btnCamera">② 开启摄像头实时扫描</button>
+    <button class="btn btn-success" id="btnCamera">摄像头</button>
     <button class="btn btn-danger" id="btnStop" style="display:none">停止扫描</button>
     <div id="reader"></div>
-    <div class="hint" style="margin-top:6px; color:#dc3545;">
-      ⚠️ 如果在微信中打开，请点击右上角“在浏览器中打开”。推荐使用 Chrome 或系统自带浏览器，扫码更清晰。
-    </div>
     <div class="log" id="log"></div>
   </div>
 
@@ -132,8 +125,9 @@
   </div>
 
   <div class="card" id="tableCard" style="display:none">
-    <button class="btn btn-success" id="btnExport">③ 导出全部（带标红）</button>
-    <button class="btn btn-info" id="btnExportMatched">④ 只导出已核对行</button>
+    <button class="btn btn-success" id="btnExport">导出全部（带标红）</button>
+    <button class="btn btn-info" id="btnExportMatched">已扫描</button>
+    <button class="btn btn-dark" id="btnExportLog">运行日志</button>
     <button class="btn btn-warning" id="btnLocate">📍 定位最后核对项</button>
     <span id="exportName" class="hint"></span>
     <div class="table-wrap" style="margin-top:10px"><table id="grid"></table></div>
@@ -200,6 +194,7 @@ let matchColIdx = -1, matchedSet = new Set(), codeIndex = new Map();
 let fileBase = "核对结果";
 let lastHitRow = -1;
 let hasSavedData = false;
+let checkLog = [];
 const $ = id => document.getElementById(id);
 
 /* =========================================================
@@ -209,6 +204,7 @@ const DB_NAME = 'philips_check_db';
 const DB_VERSION = 1;
 const DB_STORE = 'table_data';
 const KEY_MATCHED = 'philips_check_matched_v1';
+const KEY_LOG = 'philips_check_log_v1';
 
 let _dbPromise = null;
 function openDB() {
@@ -268,6 +264,27 @@ function loadMatched() {
 }
 function clearMatched() {
   try { localStorage.removeItem(KEY_MATCHED); } catch(e) {}
+}
+
+function saveLog() {
+  try {
+    const toSave = checkLog.slice(-5000);
+    localStorage.setItem(KEY_LOG, JSON.stringify(toSave));
+  } catch(e) {
+    console.warn("保存日志失败", e);
+    try {
+      localStorage.setItem(KEY_LOG, JSON.stringify(checkLog.slice(-1000)));
+    } catch(e2) {}
+  }
+}
+function loadLogFromStorage() {
+  try {
+    const s = localStorage.getItem(KEY_LOG);
+    return s ? JSON.parse(s) : [];
+  } catch(e) { return []; }
+}
+function clearLog() {
+  try { localStorage.removeItem(KEY_LOG); } catch(e) {}
 }
 
 /* =========================================================
@@ -406,7 +423,9 @@ function pickFile() {
 
       matchedSet = new Set();
       lastHitRow = -1;
+      checkLog = [];
       clearMatched();
+      clearLog();
       buildIndex();
       renderTable(); updateStats();
 
@@ -492,6 +511,18 @@ $("btnLocate").onclick = () => {
 };
 
 /* ===== 核对逻辑 ===== */
+function addLog(code, result, info) {
+  const d = new Date();
+  const timeStr = d.getFullYear() + "-" +
+    String(d.getMonth()+1).padStart(2,'0') + "-" +
+    String(d.getDate()).padStart(2,'0') + " " +
+    String(d.getHours()).padStart(2,'0') + ":" +
+    String(d.getMinutes()).padStart(2,'0') + ":" +
+    String(d.getSeconds()).padStart(2,'0');
+  checkLog.push({ time: timeStr, code: code, result: result, info: info || "" });
+  saveLog();
+}
+
 function check(code){
   code = String(code||"").trim(); if(!code) return;
   const list = codeIndex.get(code);
@@ -508,18 +539,22 @@ function check(code){
     renderTable(); updateStats();
     saveMatched();
 
+    const info = getRowInfo(hit);
+    addLog(code, "成功", info);
+
     playBeep('ok');
     speak("可以配送");
 
-    const info = getRowInfo(hit);
     toast("✅ 已核对 · 可以配送", info);
   } else if(dup){
     logMsg("dup", ts + " ⚠️ 重复扫描：" + code);
+    addLog(code, "重复", "该条码已核对过");
     playBeep('dup');
     speak("重复扫描");
     toast("⚠️ 重复扫描", "该条码已核对过：" + code);
   } else {
     logMsg("miss", ts + " ❌ 未在表格中找到：" + code);
+    addLog(code, "失败", "未在表格中找到");
     playBeep('miss');
     speak("不可配送，需滞留");
     toast("❌ 不可配送，需滞留", "未在表格中找到：" + code);
@@ -736,7 +771,7 @@ $("btnCamera").onclick = async () => {
 $("btnStop").onclick = () => { stopScan(); };
 
 /* =========================================================
-   导出工具（统一文件名格式）
+   导出工具
    ========================================================= */
 function getTodayStr() {
   const d = new Date();
@@ -796,13 +831,13 @@ async function buildAndShareExcel(rowIdxList, outBaseName) {
   }
 }
 
-/* 按钮③：导出全部 → 文件名 = 当天年月日，如 2026-10-14.xlsx */
+/* 导出全部 → 当天年月日.xlsx */
 $("btnExport").onclick = () => {
   if (!rows.length) return;
   buildAndShareExcel(rows.map((_, i) => i), getTodayStr());
 };
 
-/* 按钮④：只导出已核对行 → 文件名 = 年月日已配送的明细，如 2026-10-14已配送的明细.xlsx */
+/* 已扫描 → 年月日已配送的明细.xlsx */
 $("btnExportMatched").onclick = () => {
   if (!rows.length) return;
   if (matchedSet.size === 0) {
@@ -813,14 +848,72 @@ $("btnExportMatched").onclick = () => {
   buildAndShareExcel(idxList, getTodayStr() + "已配送的明细");
 };
 
+/* 运行日志 → 年月日核对日志.xlsx */
+$("btnExportLog").onclick = async () => {
+  if (typeof ExcelJS === "undefined") {
+    toast("导出组件未加载完成", "请稍后再试，或刷新页面");
+    return;
+  }
+  if (!checkLog.length) {
+    toast("提示", "还没有运行日志可导出");
+    return;
+  }
+  try {
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet("核对日志");
+    const headerRow = ws.addRow(["序号", "时间", "条码", "核对结果", "详细信息"]);
+    headerRow.font = { bold: true };
+
+    checkLog.forEach((item, idx) => {
+      const row = ws.addRow([idx + 1, item.time, item.code, item.result, item.info || ""]);
+      if (item.result === "成功") {
+        row.getCell(4).font = { color: { argb: "FF198754" }, bold: true };
+      } else if (item.result === "失败") {
+        row.getCell(4).font = { color: { argb: "FFDC3545" }, bold: true };
+      } else if (item.result === "重复") {
+        row.getCell(4).font = { color: { argb: "FFFD7E14" }, bold: true };
+      }
+    });
+
+    ws.getColumn(1).width = 8;
+    ws.getColumn(2).width = 22;
+    ws.getColumn(3).width = 25;
+    ws.getColumn(4).width = 12;
+    ws.getColumn(5).width = 60;
+
+    const buf = await wb.xlsx.writeBuffer();
+    const outName = getTodayStr() + "核对日志.xlsx";
+    $("exportName").textContent = "已生成：" + outName;
+
+    const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const file = new File([blob], outName, { type: blob.type });
+
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file], title: "核对日志" }); return; }
+      catch(e){ if(e.name === "AbortError") return; }
+    }
+
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = outName;
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
+    toast("已下载", outName);
+  } catch (err) {
+    toast("导出失败", err.message);
+  }
+};
+
 /* ===== 清除保存的数据 ===== */
 $("btnClearStorage").onclick = async () => {
   if (!confirm("确定要清除已保存的表格和核对进度吗？此操作不可恢复。")) return;
   await deleteTableData();
   clearMatched();
+  clearLog();
   hasSavedData = false;
   headers = []; rows = []; matchColIdx = -1;
   matchedSet = new Set(); codeIndex = new Map();
+  checkLog = [];
   lastHitRow = -1; fileBase = "核对结果";
   $("restoreBanner").style.display = "none";
   $("fileName").textContent = "";
@@ -838,6 +931,8 @@ $("btnClearStorage").onclick = async () => {
    ========================================================= */
 async function tryRestore() {
   try {
+    checkLog = loadLogFromStorage();
+
     const data = await loadTableData();
     if (!data || !data.rows || !data.rows.length) { hasSavedData = false; return; }
 
