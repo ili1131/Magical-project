@@ -277,6 +277,8 @@ td.matched{background:#ffe3e3 !important;color:#b02a37;font-weight:700}
 .voiceBlock.norm .content{font-size:17px;color:#1f8a3b;font-weight:800;letter-spacing:1px}
 .voiceActions{display:flex;gap:8px;margin-top:14px}
 .voiceActions .btn{flex:1;padding:11px 6px;font-size:13px}
+#voiceHoldBtn{touch-action:none;user-select:none;-webkit-user-select:none}
+#voiceHoldBtn.holding{background:linear-gradient(180deg,rgba(255,240,220,.95),rgba(255,215,180,.8));color:#8a5400;transform:scale(.97);box-shadow:0 2px 10px rgba(31,38,135,.18), inset 0 1px 0 rgba(255,255,255,.85)}
 
 #fuzzyMask{position:fixed;inset:0;background:rgba(20,24,38,.3);display:none;align-items:center;justify-content:center;z-index:500;padding:18px;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
 #fuzzyMask.show{display:flex}
@@ -391,14 +393,14 @@ td.matched{background:#ffe3e3 !important;color:#b02a37;font-weight:700}
 <div class="voiceHint">
 📌 摄像头扫码：完全匹配（一字不差）<br>
 📌 语音识别：可以只读数字进行搜索匹配<br>
-💡 阿拉伯数字或中文数字均可，中间停顿不影响，说完等 1.5 秒自动结束
+💡 阿拉伯数字或中文数字均可，<b>按住按钮说话，松开即识别</b>
 </div>
 <div id="voiceStatus">准备中…</div>
 <div class="voiceBlock"><span class="label">识别到的原文</span><div class="content" id="voiceRawText">（等待语音…）</div></div>
 <div class="voiceBlock norm"><span class="label" style="color:#1f8a3b">用于比对（中文数字已转阿拉伯）</span><div class="content" id="voiceNormalizedText">—</div></div>
 <div class="voiceActions">
 <button class="btn btn-secondary" id="voiceCancelBtn">取消</button>
-<button class="btn btn-warning" id="voiceRetryBtn">重说</button>
+<button class="btn btn-warning" id="voiceHoldBtn">🎤 按住说话</button>
 <button class="btn btn-primary" id="voiceConfirmBtn" disabled>查找匹配</button>
 </div>
 </div>
@@ -558,42 +560,39 @@ if(matchColIdx===-1){rows.forEach((row,i)=>{row.forEach((val,j)=>{evalCell(i,j,v
 else if(matchColIdx>=0){rows.forEach((row,i)=>{evalCell(i,matchColIdx,row[matchColIdx])})}
 candidates.sort((a,b)=>b.score-a.score);return candidates.slice(0,5)}
 
-/* 语音识别 —— 安卓自动重启版 */
-let voiceRec=null,voiceRawText="",voiceNormalizedText="",voiceSilenceTimer=null,voiceActive=false;
-let voiceRestarting=false;            // 防止 onend 反复重启
-let voiceManuallyStopped=false;       // 用户主动取消/重说/确认时置 true，阻止自动重启
-let voiceRestartCount=0;              // 重启次数上限，避免死循环
+/* ============ 语音识别 —— 按住说话版 ============ */
+let voiceRec=null,voiceRawText="",voiceNormalizedText="",voiceActive=false;
+let voiceHolding=false;
 
 function getSpeechRecognitionClass(){return window.SpeechRecognition||window.webkitSpeechRecognition||null}
 
-function startVoiceRecognition(){
+function openVoicePanel(){
   const SR=getSpeechRecognitionClass();
   if(!SR){
     popup("不支持语音识别","当前浏览器不支持网页语音识别。<br><br>建议使用：<br>• Android Chrome / Edge<br>• iOS Safari 14.5+<br>• 桌面 Chrome / Edge<br><br>微信内置浏览器不支持，请用系统浏览器打开。");
     return;
   }
-  voiceRawText="";voiceNormalizedText="";
-  voiceActive=true;
-  voiceManuallyStopped=false;
-  voiceRestartCount=0;
-
+  voiceRawText="";voiceNormalizedText="";voiceActive=false;voiceHolding=false;
   $("voiceRawText").textContent="（等待语音…）";
   $("voiceNormalizedText").textContent="—";
-  $("voiceStatus").textContent="🎤 正在聆听… 请读出条码";
+  $("voiceStatus").textContent="🎤 按住下方按钮说话，松开结束";
   $("voiceConfirmBtn").disabled=true;
+  $("voiceHoldBtn").classList.remove("holding");
   $("voiceMask").classList.add("show");
-
-  createAndStartRecognizer();
 }
 
-function createAndStartRecognizer(){
+function startHoldVoice(){
+  if(voiceHolding)return;
   const SR=getSpeechRecognitionClass();
-  if(!SR){return}
+  if(!SR)return;
+  voiceHolding=true;
+  $("voiceHoldBtn").classList.add("holding");
+  $("voiceStatus").textContent="🎤 正在聆听… 松开结束";
+
   try{
     voiceRec=new SR();
     voiceRec.lang='zh-CN';
-    // 安卓上 continuous=true 会导致立即结束或行为异常，统一设为 false，用 onend 自动重启模拟持续监听
-    voiceRec.continuous=false;
+    voiceRec.continuous=true;
     voiceRec.interimResults=true;
     voiceRec.maxAlternatives=1;
 
@@ -609,108 +608,80 @@ function createAndStartRecognizer(){
       $("voiceRawText").textContent=displayRaw||"（等待语音…）";
       $("voiceNormalizedText").textContent=norm||"—";
       if(norm)$("voiceConfirmBtn").disabled=false;
-
-      // 静音 1.5 秒后主动 stop，触发 onend
-      clearTimeout(voiceSilenceTimer);
-      voiceSilenceTimer=setTimeout(()=>{
-        try{voiceRec.stop()}catch(e){}
-      },1500);
     };
 
     voiceRec.onerror=(e)=>{
       console.warn("[语音] 错误:",e.error);
       if(e.error==='not-allowed'||e.error==='service-not-allowed'){
         $("voiceStatus").textContent="❌ 麦克风权限被拒绝，请在浏览器设置中允许";
-        voiceManuallyStopped=true;
-        voiceActive=false;
       }else if(e.error==='no-speech'){
-        // 没检测到语音：不算致命错误，交给 onend 决定是否重启
-        $("voiceStatus").textContent="🎤 未检测到语音，继续聆听…";
+        $("voiceStatus").textContent="⚠️ 没有检测到语音，请再按住试一次";
       }else if(e.error==='network'){
         $("voiceStatus").textContent="❌ 网络错误，请检查网络后重试";
-        voiceManuallyStopped=true;
-        voiceActive=false;
       }else if(e.error==='aborted'){
-        // 主动 stop 会触发 aborted，属于正常流程，忽略
+        /* 主动停止触发，忽略 */
       }else{
         $("voiceStatus").textContent="❌ 识别出错："+e.error;
       }
     };
 
     voiceRec.onend=()=>{
-      clearTimeout(voiceSilenceTimer);
-      voiceSilenceTimer=null;
-
+      voiceActive=false;
+      voiceHolding=false;
+      $("voiceHoldBtn").classList.remove("holding");
       const norm=basicNormalize(voiceRawText);
       voiceNormalizedText=norm;
-
-      // 用户已点取消/重说/确认，或权限被拒 → 不再重启
-      if(voiceManuallyStopped||!voiceActive){
-        voiceActive=false;
-        if(norm){
-          $("voiceStatus").textContent="✅ 识别完成，请点「查找匹配」";
-          $("voiceConfirmBtn").disabled=false;
-        }else{
-          $("voiceStatus").textContent="⚠️ 没有识别到内容，请点「重说」";
-          $("voiceConfirmBtn").disabled=true;
-        }
-        return;
-      }
-
-      // 已经识别到内容 → 不再自动重启，交给用户点「查找匹配」
       if(norm){
-        voiceActive=false;
         $("voiceStatus").textContent="✅ 识别完成，请点「查找匹配」";
         $("voiceConfirmBtn").disabled=false;
-        return;
-      }
-
-      // 没有内容，且重启次数未超限 → 自动重启继续聆听（安卓核心修复点）
-      if(voiceRestartCount>=5){
-        voiceActive=false;
-        $("voiceStatus").textContent="⚠️ 没有识别到内容，请点「重说」";
+      }else{
+        $("voiceStatus").textContent="⚠️ 没有识别到内容，请再按住试一次";
         $("voiceConfirmBtn").disabled=true;
-        return;
       }
-
-      voiceRestartCount++;
-      voiceRestarting=true;
-      $("voiceStatus").textContent="🎤 继续聆听…";
-      setTimeout(()=>{
-        voiceRestarting=false;
-        if(voiceActive&&!voiceManuallyStopped){
-          createAndStartRecognizer();
-        }
-      },120);
     };
 
     voiceRec.start();
+    voiceActive=true;
   }catch(err){
     console.error("[语音] 启动失败:",err);
     $("voiceStatus").textContent="❌ 无法启动语音识别："+(err.message||err);
-    voiceActive=false;
+    voiceHolding=false;voiceActive=false;
+    $("voiceHoldBtn").classList.remove("holding");
   }
 }
 
-function stopVoiceRecognition(){
-  clearTimeout(voiceSilenceTimer);
-  voiceSilenceTimer=null;
-  voiceManuallyStopped=true;
-  voiceActive=false;
-  if(voiceRec){
-    try{voiceRec.stop()}catch(e){}
-    try{voiceRec.abort()}catch(e){}
-    voiceRec=null;
-  }
+function stopHoldVoice(){
+  if(!voiceHolding)return;
+  voiceHolding=false;
+  $("voiceHoldBtn").classList.remove("holding");
+  $("voiceStatus").textContent="⏳ 正在识别…";
+  if(voiceRec){try{voiceRec.stop()}catch(e){}}
 }
+
+function stopVoiceRecognition(){
+  voiceHolding=false;voiceActive=false;
+  $("voiceHoldBtn").classList.remove("holding");
+  if(voiceRec){try{voiceRec.stop()}catch(e){}try{voiceRec.abort()}catch(e){}voiceRec=null;}
+}
+
 function closeVoicePanel(){
   stopVoiceRecognition();
   $("voiceMask").classList.remove("show");
 }
 
-$("btnVoice").onclick=()=>{initAudioAndUnlock();startVoiceRecognition()};
+$("btnVoice").onclick=()=>{initAudioAndUnlock();openVoicePanel()};
 $("voiceCancelBtn").onclick=()=>{closeVoicePanel()};
-$("voiceRetryBtn").onclick=()=>{stopVoiceRecognition();setTimeout(()=>startVoiceRecognition(),200)};
+
+(function(){
+  const holdBtn=$("voiceHoldBtn");
+  if(!holdBtn)return;
+  holdBtn.addEventListener("pointerdown",function(e){e.preventDefault();startHoldVoice()});
+  holdBtn.addEventListener("pointerup",function(e){e.preventDefault();stopHoldVoice()});
+  holdBtn.addEventListener("pointercancel",function(e){e.preventDefault();stopHoldVoice()});
+  holdBtn.addEventListener("pointerleave",function(e){if(voiceHolding)stopHoldVoice()});
+  holdBtn.addEventListener("contextmenu",function(e){e.preventDefault()});
+})();
+
 $("voiceConfirmBtn").onclick=()=>{
   const raw=(voiceRawText||"").trim();
   if(!raw){toast("提示","没有可提交的内容");return}
@@ -718,7 +689,9 @@ $("voiceConfirmBtn").onclick=()=>{
   $("voiceMask").classList.remove("show");
   showFuzzyMatch(raw);
 };
-document.addEventListener("visibilitychange",function(){if(document.hidden&&voiceActive){closeVoicePanel()}});
+
+document.addEventListener("visibilitychange",function(){if(document.hidden){closeVoicePanel()}});
+/* ============ 语音识别 结束 ============ */
 
 /* 模糊匹配弹窗 */
 let fuzzyCandidates=[],fuzzySelectedIdx=-1;
@@ -734,7 +707,7 @@ btn.onclick=()=>{fuzzySelectedIdx=idx;list.querySelectorAll(".fuzzyItem").forEac
 list.appendChild(btn)})}
 $("fuzzyMask").classList.add("show")}
 $("fuzzyCancelBtn").onclick=()=>{$("fuzzyMask").classList.remove("show")};
-$("fuzzyRetryBtn").onclick=()=>{$("fuzzyMask").classList.remove("show");setTimeout(()=>startVoiceRecognition(),200)};
+$("fuzzyRetryBtn").onclick=()=>{$("fuzzyMask").classList.remove("show");setTimeout(()=>openVoicePanel(),200)};
 $("fuzzyConfirmBtn").onclick=()=>{if(fuzzySelectedIdx<0||!fuzzyCandidates[fuzzySelectedIdx]){toast("提示","请先选择一个匹配项");return}
 const sel=fuzzyCandidates[fuzzySelectedIdx];$("fuzzyMask").classList.remove("show");markMatched(sel.r,sel.c,sel.text,"语音模糊匹配")};
 
