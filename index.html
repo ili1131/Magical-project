@@ -347,7 +347,6 @@ function vibrate(t){if(!navigator.vibrate)return;try{if(t==='ok')navigator.vibra
 let audioCtx=null;
 function ensureCtx(){if(!audioCtx){const AC=window.AudioContext||window.webkitAudioContext;if(AC)audioCtx=new AC()}return audioCtx}
 
-/* ★ 音效增强版：方波主音 + 双倍频泛音，音量更响 */
 function playTone(ctx,freq,dur,vol,st){
   try{
     const o1=ctx.createOscillator(),g=ctx.createGain();
@@ -464,7 +463,8 @@ if(matchColIdx===-1){rows.forEach((row,i)=>{row.forEach((val,j)=>{evalCell(i,j,v
 else if(matchColIdx>=0){rows.forEach((row,i)=>{evalCell(i,matchColIdx,row[matchColIdx])})}
 candidates.sort((a,b)=>b.score-a.score);return candidates.slice(0,5)}
 
-let voiceRec=null,voiceRawText="",voiceNormalizedText="",voiceActive=false;
+/* ============ 语音识别 —— iOS interim 兜底版 ============ */
+let voiceRec=null,voiceRawText="",voiceDisplayText="",voiceNormalizedText="",voiceActive=false;
 let voiceHolding=false;
 let voiceStream=null;
 let voiceEndTimer=null;
@@ -487,7 +487,7 @@ function openVoicePanel(){
     popup("当前浏览器不支持语音识别","你正在使用的浏览器无法使用网页语音识别功能。<br><br>建议更换为：<br>• <b>Android Chrome</b>（支持最好）<br>• <b>iOS Safari 14.5+</b><br>• 桌面 Chrome / Edge<br><br>三星浏览器和 Android Edge 目前不支持此功能。");
     return;
   }
-  voiceRawText="";voiceNormalizedText="";voiceActive=false;voiceHolding=false;
+  voiceRawText="";voiceDisplayText="";voiceNormalizedText="";voiceActive=false;voiceHolding=false;
   clearTimeout(voiceEndTimer);voiceEndTimer=null;
   $("voiceRawText").textContent="（等待语音…）";
   $("voiceNormalizedText").textContent="—";
@@ -506,6 +506,8 @@ function startHoldVoice(){
   $("voiceHoldBtn").classList.add("holding");
   $("voiceStatus").textContent="🎤 正在聆听… 松开结束";
   clearTimeout(voiceEndTimer);voiceEndTimer=null;
+  voiceDisplayText="";
+  voiceRawText="";
 
   try{
     voiceRec=new SR();
@@ -518,9 +520,11 @@ function startHoldVoice(){
       let interim="";
       for(let i=e.resultIndex;i<e.results.length;i++){
         const t=e.results[i][0].transcript;
-        if(e.results[i].isFinal){voiceRawText+=t}else{interim+=t}
+        if(e.results[i].isFinal){voiceRawText+=t}
+        else{interim+=t}
       }
       const displayRaw=voiceRawText+interim;
+      voiceDisplayText=displayRaw;    /* ★ 关键：保存当前显示文本，供 onend 兜底 */
       const norm=basicNormalize(displayRaw);
       $("voiceRawText").textContent=displayRaw||"（等待语音…）";
       $("voiceNormalizedText").textContent=norm||"—";
@@ -539,10 +543,18 @@ function startHoldVoice(){
     voiceRec.onend=()=>{
       voiceActive=false;voiceHolding=false;
       $("voiceHoldBtn").classList.remove("holding");
-      const norm=basicNormalize(voiceRawText);
+      /* ★ 关键修复：iOS 上 SpeechRecognition 可能全部只返回 interim，
+         导致 voiceRawText 为空。这里用 voiceDisplayText 作为兜底。 */
+      const finalText=(voiceRawText||voiceDisplayText||"").trim();
+      const norm=basicNormalize(finalText);
       voiceNormalizedText=norm;
-      if(norm){$("voiceStatus").textContent="✅ 识别完成，请点「查找匹配」";$("voiceConfirmBtn").disabled=false}
-      else{$("voiceStatus").textContent="⚠️ 没有识别到内容，请再按住试一次";$("voiceConfirmBtn").disabled=true}
+      if(norm){
+        $("voiceStatus").textContent="✅ 识别完成，请点「查找匹配」";
+        $("voiceConfirmBtn").disabled=false;
+      }else{
+        $("voiceStatus").textContent="⚠️ 没有识别到内容，请再按住试一次";
+        $("voiceConfirmBtn").disabled=true;
+      }
     };
 
     voiceRec.start();
@@ -587,7 +599,8 @@ $("voiceCancelBtn").onclick=()=>{closeVoicePanel()};
 })();
 
 $("voiceConfirmBtn").onclick=()=>{
-  const raw=(voiceRawText||"").trim();
+  /* ★ 同样用兜底值 */
+  const raw=((voiceRawText||voiceDisplayText)||"").trim();
   if(!raw){toast("提示","没有可提交的内容");return}
   stopVoiceRecognition();
   $("voiceMask").classList.remove("show");
@@ -595,6 +608,7 @@ $("voiceConfirmBtn").onclick=()=>{
 };
 
 document.addEventListener("visibilitychange",function(){if(document.hidden){closeVoicePanel()}});
+/* ============ 语音识别 结束 ============ */
 
 let fuzzyCandidates=[],fuzzySelectedIdx=-1;
 function showFuzzyMatch(input){const candidates=fuzzyFindCandidates(input);fuzzyCandidates=candidates;fuzzySelectedIdx=candidates.length>0?0:-1;
