@@ -25,15 +25,13 @@ body{
   margin:0;color:var(--ink);
   background:
     radial-gradient(900px 700px at 15% 10%, #d9e6ff 0%, rgba(217,230,255,0) 60%),
-    radial-gradient(800px 700px at 90% 20%, #ffe3ef 0%, rgba(255,227,239,0) 55%),
     radial-gradient(900px 900px at 50% 100%, #d4ecff 0%, rgba(212,236,255,0) 60%),
-    linear-gradient(160deg,#eef3fb 0%,#e6ecf6 50%,#f0e8f3 100%);
+    linear-gradient(160deg,#eef3fb 0%,#e6ecf6 50%,#eaf0f8 100%);
   background-attachment:fixed;
   min-height:100vh;-webkit-font-smoothing:antialiased;
 }
 header,main,.toast,#loadStatus,#modalMask,#colPickerMask,#voiceMask,#fuzzyMask{position:relative;z-index:1}
 
-/* ========= iOS Liquid Glass 核心 ========= */
 .liquid{
   position:relative;
   background: linear-gradient(180deg, rgba(255,255,255,0.30) 0%, rgba(255,255,255,0.10) 40%, rgba(255,255,255,0.06) 100%);
@@ -41,52 +39,23 @@ header,main,.toast,#loadStatus,#modalMask,#colPickerMask,#voiceMask,#fuzzyMask{p
   -webkit-backdrop-filter: blur(30px) saturate(190%) brightness(1.05);
   backdrop-filter: blur(30px) saturate(190%) brightness(1.05);
   box-shadow:
-    /* 外侧极淡投影（营造悬浮感，非常轻） */
     0 2px 6px rgba(31,38,135,0.05),
-    /* 顶部内高光（玻璃边缘反光） */
     inset 0 1px 0 rgba(255,255,255,0.75),
     inset 0 2px 6px rgba(255,255,255,0.25),
-    /* 底部内反光（模拟玻璃背面反射） */
     inset 0 -1px 0 rgba(255,255,255,0.35),
     inset 0 -2px 8px rgba(200,220,255,0.18),
-    /* 左右边缘反光 */
     inset 1px 0 0 rgba(255,255,255,0.25),
     inset -1px 0 0 rgba(255,255,255,0.25);
 }
-/* 液体表面的微妙光泽（左上角高光斑） */
 .liquid::before{
   content:"";
-  position:absolute;
-  inset:0;
-  border-radius:inherit;
-  pointer-events:none;
+  position:absolute;inset:0;border-radius:inherit;pointer-events:none;
   background:
     radial-gradient(120% 80% at 0% 0%, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0) 45%),
     radial-gradient(80% 60% at 100% 100%, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0) 50%);
   mix-blend-mode:screen;
 }
-/* 边缘极细的折射光带 */
-.liquid::after{
-  content:"";
-  position:absolute;
-  inset:0;
-  border-radius:inherit;
-  pointer-events:none;
-  background: linear-gradient(135deg,
-    rgba(255,255,255,0.5) 0%,
-    rgba(255,255,255,0) 25%,
-    rgba(255,255,255,0) 75%,
-    rgba(255,255,255,0.25) 100%);
-  -webkit-mask:
-    linear-gradient(#000 0 0) content-box,
-    linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-          mask-composite: exclude;
-  padding:0.5px;
-  opacity:0.9;
-}
 
-/* ========= 顶部栏 ========= */
 header{
   margin:14px 14px 0;
   padding:16px 20px;
@@ -126,7 +95,6 @@ header h1{font-size:19px;margin:0;flex:1;letter-spacing:.3px;font-weight:700;pos
 
 main{max-width:960px;margin:0 auto;padding:14px 14px 28px}
 
-/* ========= 卡片 ========= */
 .card{
   position:relative;
   padding: 18px;
@@ -154,7 +122,6 @@ main{max-width:960px;margin:0 auto;padding:14px 14px 28px}
   mix-blend-mode:screen;
 }
 
-/* ========= 按钮：iOS 液态玻璃 ========= */
 .btn{
   position:relative;
   display:inline-block;
@@ -182,7 +149,6 @@ main{max-width:960px;margin:0 auto;padding:14px 14px 28px}
   user-select:none;
   overflow:hidden;
 }
-/* 左上角玻璃光泽斑 */
 .btn::before{
   content:"";
   position:absolute;inset:0;
@@ -206,7 +172,6 @@ main{max-width:960px;margin:0 auto;padding:14px 14px 28px}
 .btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
 .btn-sm{padding:8px 14px;font-size:13px;border-radius:14px}
 
-/* 所有按钮类型统一为液态玻璃 */
 .btn-primary,.btn-success,.btn-secondary,.btn-warning,.btn-info,.btn-dark{
   color: var(--ink);
   background: linear-gradient(180deg,
@@ -215,7 +180,6 @@ main{max-width:960px;margin:0 auto;padding:14px 14px 28px}
     rgba(255,255,255,0.06) 100%);
   border-color: rgba(255,255,255,0.55);
 }
-/* 危险按钮：只红字，玻璃壳和别的一样 */
 .btn-danger{
   color: #d63840;
   background: linear-gradient(180deg,
@@ -235,7 +199,6 @@ main{max-width:960px;margin:0 auto;padding:14px 14px 28px}
 .btn-grid .btn{margin:0;width:100%;padding:18px 10px;font-size:14px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2;border-radius:var(--radius-md)}
 .btn-grid .btn.span-2{grid-column:1/-1}
 
-/* ========= 恢复提示条 ========= */
 #restoreBanner{
   display:none;align-items:center;gap:8px;flex-wrap:wrap;
   padding:14px 16px;font-size:14px;line-height:1.6;margin-bottom:14px;color:var(--ink-2);
@@ -258,7 +221,6 @@ main{max-width:960px;margin:0 auto;padding:14px 14px 28px}
 }
 #restoreBanner .spacer{flex:1}
 
-/* ========= 统计 ========= */
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
 .stat{
   position:relative;
@@ -283,7 +245,6 @@ main{max-width:960px;margin:0 auto;padding:14px 14px 28px}
 .stat[style*="198754"]{color:var(--ok)!important}
 .stat[style*="dc3545"]{color:var(--bad)!important}
 
-/* ========= 摄像头区域 ========= */
 #readerWrap{display:none;margin-bottom:14px}
 #reader{
   position:relative;width:100%;max-width:480px;margin:0 auto;
@@ -314,7 +275,6 @@ main{max-width:960px;margin:0 auto;padding:14px 14px 28px}
 .log .dup{color:var(--warn)}
 .log .miss{color:var(--bad)}
 
-/* ========= 表格：保持清晰不透明 ========= */
 table{border-collapse:collapse;font-size:13px;width:max-content;min-width:100%}
 th,td{border:1px solid #e3e7ee;padding:8px 10px;text-align:left;white-space:nowrap;color:#1c1c1e}
 th{background:#f2f6fa;position:sticky;top:0;z-index:1;font-weight:700}
@@ -330,7 +290,6 @@ td.matched{background:#ffe3e3 !important;color:#b02a37;font-weight:700}
 #fileName{font-size:13px;color:var(--accent);margin-left:6px;word-break:break-all}
 #uploadBusy{display:none;margin-left:8px;font-size:13px;color:var(--accent)}
 
-/* ========= Toast ========= */
 .toast{
   position:fixed;left:50%;bottom:60px;transform:translateX(-50%);
   padding:16px 24px;border-radius:22px;font-size:15px;display:none;z-index:99;
@@ -348,7 +307,6 @@ td.matched{background:#ffe3e3 !important;color:#b02a37;font-weight:700}
 .toast .head{font-size:16px;font-weight:700}
 .toast .info{display:block;font-size:13px;font-weight:500;color:#8a5a00;margin-top:6px}
 
-/* ========= 加载层 ========= */
 #loadStatus{
   position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
   z-index:100;font-size:15px;color:var(--ink-2);
@@ -359,7 +317,6 @@ td.matched{background:#ffe3e3 !important;color:#b02a37;font-weight:700}
 @keyframes spin{to{transform:rotate(360deg)}}
 #loadRetry{display:none}
 
-/* ========= 弹层 ========= */
 #modalMask,#colPickerMask,#voiceMask,#fuzzyMask{
   position:fixed;inset:0;background:rgba(0,0,0,0.18);display:none;align-items:center;justify-content:center;padding:18px;
   -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
@@ -716,7 +673,7 @@ if(matchColIdx===-1){rows.forEach((row,i)=>{row.forEach((val,j)=>{evalCell(i,j,v
 else if(matchColIdx>=0){rows.forEach((row,i)=>{evalCell(i,matchColIdx,row[matchColIdx])})}
 candidates.sort((a,b)=>b.score-a.score);return candidates.slice(0,5)}
 
-/* ============ 语音识别 ============ */
+/* ============ 语音识别（含 Kimi 修复方案） ============ */
 let voiceRec=null,voiceRawText="",voiceDisplayText="",voiceNormalizedText="",voiceActive=false;
 let voiceHolding=false;
 let voiceStream=null;
@@ -733,6 +690,16 @@ async function warmupMic(){
     voiceStream=null;
     return true;
   }catch(e){console.warn("[语音] 预热麦克风失败:",e);return false}
+}
+
+// ★ 识别前：让出音频焦点，避免 Android 上被提示音挤掉
+function pauseAppAudio(){
+  try{if(window.speechSynthesis)speechSynthesis.cancel()}catch(e){}
+  try{if(audioCtx&&audioCtx.state==='running')audioCtx.suspend()}catch(e){}
+}
+// ★ 识别结束：恢复提示音
+function resumeAppAudio(){
+  try{if(audioCtx&&audioCtx.state==='suspended')audioCtx.resume()}catch(e){}
 }
 
 function openVoicePanel(){
@@ -759,8 +726,13 @@ function startHoldVoice(){
   $("voiceHoldBtn").classList.add("holding");
   $("voiceStatus").textContent="🎤 正在聆听… 松开结束";
   clearTimeout(voiceEndTimer);voiceEndTimer=null;
-  voiceDisplayText="";
-  voiceRawText="";
+  voiceDisplayText="";voiceRawText="";
+  pauseAppAudio();   // ★ 关键：识别前挂起 AudioContext、停掉语音播报
+  startVoiceRec();
+}
+
+function startVoiceRec(){
+  const SR=getSpeechRecognitionClass();
   try{
     voiceRec=new SR();
     voiceRec.lang='zh-CN';
@@ -783,13 +755,26 @@ function startHoldVoice(){
     voiceRec.onerror=(e)=>{
       console.warn("[语音] 错误:",e.error);
       if(e.error==='aborted')return;
-      if(e.error==='not-allowed'||e.error==='service-not-allowed'){$("voiceStatus").textContent="❌ 麦克风权限被拒绝，请在浏览器设置中允许"}
-      else if(e.error==='no-speech'){$("voiceStatus").textContent="⚠️ 没有检测到语音，请再按住试一次"}
-      else if(e.error==='network'){$("voiceStatus").textContent="❌ 网络错误，请检查网络后重试"}
-      else{$("voiceStatus").textContent="❌ 识别出错："+e.error}
+      if(e.error==='not-allowed'||e.error==='service-not-allowed'){
+        $("voiceStatus").textContent="❌ 麦克风权限被拒绝，请在浏览器设置中允许";
+      }else if(e.error==='no-speech'){
+        $("voiceStatus").textContent="⚠️ 没有检测到语音，请再按住试一次";
+      }else if(e.error==='network'){
+        // ★ 原因 C：安卓 Chrome 识别要连 Google 服务器
+        $("voiceStatus").textContent="❌ 网络无法连接语音服务（安卓需能访问 Google），请改用扫码或 iPhone";
+      }else{
+        $("voiceStatus").textContent="❌ 识别出错："+e.error;
+      }
     };
     voiceRec.onend=()=>{
-      voiceActive=false;voiceHolding=false;
+      resumeAppAudio();   // ★ 恢复提示音
+      voiceActive=false;
+      if(voiceHolding){
+        // ★ 关键：Android Chrome 会自动掐断会话，按住期间自动重启
+        $("voiceStatus").textContent="🎤 正在聆听… 松开结束";
+        setTimeout(()=>{if(voiceHolding)startVoiceRec();},200);
+        return;
+      }
       $("voiceHoldBtn").classList.remove("holding");
       const finalText=(voiceRawText||voiceDisplayText||"").trim();
       const norm=basicNormalize(finalText);
@@ -807,14 +792,14 @@ function startHoldVoice(){
   }catch(err){
     console.error("[语音] 启动失败:",err);
     $("voiceStatus").textContent="❌ 无法启动语音识别："+(err.message||err);
-    voiceHolding=false;voiceActive=false;
+    voiceHolding=false;voiceActive=false;resumeAppAudio();
     $("voiceHoldBtn").classList.remove("holding");
   }
 }
 
 function stopHoldVoice(){
   if(!voiceHolding)return;
-  voiceHolding=false;
+  voiceHolding=false;              // 先复位标志，onend 才不会自动重启
   $("voiceHoldBtn").classList.remove("holding");
   $("voiceStatus").textContent="⏳ 正在识别…";
   clearTimeout(voiceEndTimer);
@@ -825,22 +810,25 @@ function stopVoiceRecognition(){
   voiceHolding=false;voiceActive=false;
   clearTimeout(voiceEndTimer);voiceEndTimer=null;
   $("voiceHoldBtn").classList.remove("holding");
-  if(voiceRec){try{voiceRec.stop()}catch(e){}try{voiceRec.abort()}catch(e){}voiceRec=null}
+  if(voiceRec){try{voiceRec.abort()}catch(e){}voiceRec=null}
+  resumeAppAudio();
 }
 
 function closeVoicePanel(){stopVoiceRecognition();$("voiceMask").classList.remove("show")}
 
 $("btnVoice").onclick=()=>{initAudioAndUnlock();openVoicePanel()};
 $("voiceCancelBtn").onclick=()=>{closeVoicePanel()};
+
 (function(){
   const holdBtn=$("voiceHoldBtn");
   if(!holdBtn)return;
   holdBtn.addEventListener("pointerdown",function(e){e.preventDefault();startHoldVoice()});
   holdBtn.addEventListener("pointerup",function(e){e.preventDefault();stopHoldVoice()});
   holdBtn.addEventListener("pointercancel",function(e){e.preventDefault();stopHoldVoice()});
-  holdBtn.addEventListener("pointerleave",function(e){if(voiceHolding)stopHoldVoice()});
+  // ★ 已移除 pointerleave，避免手指轻微滑动就停止识别
   holdBtn.addEventListener("contextmenu",function(e){e.preventDefault()});
 })();
+
 $("voiceConfirmBtn").onclick=()=>{
   const raw=((voiceRawText||voiceDisplayText)||"").trim();
   if(!raw){toast("提示","没有可提交的内容");return}
@@ -867,7 +855,6 @@ $("fuzzyRetryBtn").onclick=()=>{$("fuzzyMask").classList.remove("show");setTimeo
 $("fuzzyConfirmBtn").onclick=()=>{if(fuzzySelectedIdx<0||!fuzzyCandidates[fuzzySelectedIdx]){toast("提示","请先选择一个匹配项");return}
 const sel=fuzzyCandidates[fuzzySelectedIdx];$("fuzzyMask").classList.remove("show");markMatched(sel.r,sel.c,sel.text,"语音模糊匹配")};
 
-/* ============ 摄像头 ============ */
 function showCamStatus(track){const el=$("camStatus");if(!el||!track)return;const caps=(track.getCapabilities?track.getCapabilities():{})||{};const parts=[];
 if(Array.isArray(caps.focusMode)&&caps.focusMode.length){const f=caps.focusMode;if(f.includes('continuous'))parts.push('自动对焦✓');else if(f.includes('single-shot'))parts.push('单次对焦');else parts.push('对焦: '+f.join('/'))}else{parts.push('对焦: 不支持')}
 if(caps.zoom&&caps.zoom.max>caps.zoom.min){parts.push('变焦 '+caps.zoom.min.toFixed(1)+'-'+caps.zoom.max.toFixed(1))}
@@ -962,7 +949,6 @@ finally{starting=false;$("btnCamera").disabled=false}};
 
 $("btnStop").onclick=function(){stopScan()};
 
-/* ============ 导出 ============ */
 function getTodayStr(){const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,'0')+"-"+String(d.getDate()).padStart(2,'0')}
 async function buildAndShareExcel(rowIdxList,outBaseName){if(typeof ExcelJS==="undefined"){toast("导出组件未加载完成","请稍后再试");return}if(!rowIdxList.length){toast("提示","没有可导出的数据");return}
 try{const wb=new ExcelJS.Workbook();const ws=wb.addWorksheet(sheetName||"核对结果");ws.addRow(headers).font={bold:true};
