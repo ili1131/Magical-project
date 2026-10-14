@@ -282,12 +282,12 @@ td.matched{background:#ffe3e3 !important;color:#b02a37;font-weight:700}
 <h3>🎤 语音识别条码</h3>
 <div class="voiceHint">
 📌 摄像头扫码：完全匹配（一字不差）<br>
-📌 语音识别：可以只读数字进行搜索匹配<br>
-💡 阿拉伯数字或中文数字均可，<b>按住按钮说话，松开即识别</b>
+📌 语音识别：可以只读数字进行搜索匹配
 </div>
 <div id="voiceStatus">准备中…</div>
 <div class="voiceBlock"><span class="label">识别到的原文</span><div class="content" id="voiceRawText">（等待语音…）</div></div>
-<div class="voiceBlock norm"><span class="label" style="color:#1f8a3b">用于比对（中文数字已转阿拉伯）</span><div class="content" id="voiceNormalizedText">—</div></div>
+<!-- 已隐藏「用于比对」栏目 -->
+<div class="voiceBlock norm" style="display:none;"><span class="label" style="color:#1f8a3b">用于比对（中文数字已转阿拉伯）</span><div class="content" id="voiceNormalizedText">—</div></div>
 <div class="voiceActions">
 <button class="btn btn-secondary" id="voiceCancelBtn">取消</button>
 <button class="btn btn-warning" id="voiceHoldBtn">🎤 按住说话</button>
@@ -524,7 +524,7 @@ function startHoldVoice(){
         else{interim+=t}
       }
       const displayRaw=voiceRawText+interim;
-      voiceDisplayText=displayRaw;    /* ★ 关键：保存当前显示文本，供 onend 兜底 */
+      voiceDisplayText=displayRaw;
       const norm=basicNormalize(displayRaw);
       $("voiceRawText").textContent=displayRaw||"（等待语音…）";
       $("voiceNormalizedText").textContent=norm||"—";
@@ -543,8 +543,6 @@ function startHoldVoice(){
     voiceRec.onend=()=>{
       voiceActive=false;voiceHolding=false;
       $("voiceHoldBtn").classList.remove("holding");
-      /* ★ 关键修复：iOS 上 SpeechRecognition 可能全部只返回 interim，
-         导致 voiceRawText 为空。这里用 voiceDisplayText 作为兜底。 */
       const finalText=(voiceRawText||voiceDisplayText||"").trim();
       const norm=basicNormalize(finalText);
       voiceNormalizedText=norm;
@@ -599,7 +597,6 @@ $("voiceCancelBtn").onclick=()=>{closeVoicePanel()};
 })();
 
 $("voiceConfirmBtn").onclick=()=>{
-  /* ★ 同样用兜底值 */
   const raw=((voiceRawText||voiceDisplayText)||"").trim();
   if(!raw){toast("提示","没有可提交的内容");return}
   stopVoiceRecognition();
