@@ -137,14 +137,21 @@
 
   <div class="card">
     <div class="btn-grid">
+      <!-- 第 1 行：Excel | 运行日志（与原来摄像头位置互换） -->
       <button class="btn btn-primary" id="btnUpload" disabled>Excel</button>
-      <button class="btn btn-success need-data" id="btnCamera" style="display:none">摄像头</button>
-      <button class="btn btn-danger" id="btnStop" style="display:none">停止扫描</button>
+      <button class="btn btn-dark need-data" id="btnExportLog" style="display:none">运行日志</button>
+
+      <!-- 第 2 行 -->
       <button class="btn btn-secondary need-data" id="btnChangeCol" style="display:none">更换核对列</button>
       <button class="btn btn-warning need-data" id="btnLocate" style="display:none">📍 定位最后核对项</button>
+
+      <!-- 第 3 行 -->
       <button class="btn btn-info need-data" id="btnExport" style="display:none">导出全部</button>
       <button class="btn btn-info need-data" id="btnExportMatched" style="display:none">已扫描</button>
-      <button class="btn btn-dark need-data span-2" id="btnExportLog" style="display:none">运行日志</button>
+
+      <!-- 第 4 行：摄像头 / 停止扫描，跨 2 列，占据底部整行 -->
+      <button class="btn btn-success need-data span-2" id="btnCamera" style="display:none">摄像头</button>
+      <button class="btn btn-danger span-2" id="btnStop" style="display:none">停止扫描</button>
     </div>
     <div style="margin-top:10px; min-height:18px;">
       <span id="fileName"></span>
@@ -333,8 +340,7 @@ function vibrate(type) {
 }
 
 /* =========================================================
-   音频 —— 【本次改动】音量全部拉满到 1.0（最大值）
-   成功/重复/失败/解锁全部 gain=1.0
+   音频（音量已全部拉满 1.0）
    ========================================================= */
 let audioCtx = null;
 function ensureCtx() {
@@ -351,7 +357,6 @@ function playTone(ctx, freq, durationMs, volume, startTime) {
     o.type = 'sine';
     o.frequency.value = freq;
     o.connect(g); g.connect(ctx.destination);
-    // 音量上限 1.0，超过会削波失真，所以直接封顶
     const v = Math.min(volume, 1.0);
     g.gain.setValueAtTime(v, startTime);
     g.gain.exponentialRampToValueAtTime(0.001, startTime + durationMs / 1000);
@@ -362,7 +367,7 @@ function playTone(ctx, freq, durationMs, volume, startTime) {
 function initAudioAndUnlock() {
   const ctx = ensureCtx();
   if (!ctx) return;
-  const fire = () => { playTone(ctx, 1500, 130, 1.0, ctx.currentTime); };  // 1.0 满音量
+  const fire = () => { playTone(ctx, 1500, 130, 1.0, ctx.currentTime); };
   if (ctx.state === 'suspended') { ctx.resume().then(fire).catch(fire); }
   else { fire(); }
 }
@@ -372,14 +377,14 @@ function playBeep(type) {
   const fire = () => {
     const now = ctx.currentTime;
     if (type === 'ok') {
-      playTone(ctx, 1500, 120, 1.0, now);          // 满音量
-      playTone(ctx, 2000, 130, 1.0, now + 0.14);   // 满音量
+      playTone(ctx, 1500, 120, 1.0, now);
+      playTone(ctx, 2000, 130, 1.0, now + 0.14);
     } else if (type === 'dup') {
-      playTone(ctx, 1000, 60, 1.0, now);           // 满音量
-      playTone(ctx, 1000, 60, 1.0, now + 0.1);     // 满音量
-      playTone(ctx, 1000, 60, 1.0, now + 0.2);     // 满音量
+      playTone(ctx, 1000, 60, 1.0, now);
+      playTone(ctx, 1000, 60, 1.0, now + 0.1);
+      playTone(ctx, 1000, 60, 1.0, now + 0.2);
     } else if (type === 'miss') {
-      playTone(ctx, 400, 500, 1.0, now);           // 满音量
+      playTone(ctx, 400, 500, 1.0, now);
     }
   };
   if (ctx.state === 'suspended') { ctx.resume().then(fire).catch(fire); }
