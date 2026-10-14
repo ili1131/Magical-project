@@ -560,11 +560,26 @@ if(matchColIdx===-1){rows.forEach((row,i)=>{row.forEach((val,j)=>{evalCell(i,j,v
 else if(matchColIdx>=0){rows.forEach((row,i)=>{evalCell(i,matchColIdx,row[matchColIdx])})}
 candidates.sort((a,b)=>b.score-a.score);return candidates.slice(0,5)}
 
-/* ============ 语音识别 —— 按住说话版 ============ */
+/* ============ 语音识别 —— 按住说话版（安卓优化：预热麦克风 + continuous=false + 松开延迟停止） ============ */
 let voiceRec=null,voiceRawText="",voiceNormalizedText="",voiceActive=false;
 let voiceHolding=false;
+let voiceStream=null;
+let voiceEndTimer=null;
 
 function getSpeechRecognitionClass(){return window.SpeechRecognition||window.webkitSpeechRecognition||null}
+
+async function warmupMic(){
+  if(voiceStream)return true;
+  try{
+    voiceStream=await navigator.mediaDevices.getUserMedia({audio:true});
+    voiceStream.getTracks().forEach(t=>t.stop());
+    voiceStream=null;
+    return true;
+  }catch(e){
+    console.warn("[语音] 预热麦克风失败:",e);
+    return false;
+  }
+}
 
 function openVoicePanel(){
   const SR=getSpeechRecognitionClass();
@@ -573,12 +588,14 @@ function openVoicePanel(){
     return;
   }
   voiceRawText="";voiceNormalizedText="";voiceActive=false;voiceHolding=false;
+  clearTimeout(voiceEndTimer);voiceEndTimer=null;
   $("voiceRawText").textContent="（等待语音…）";
   $("voiceNormalizedText").textContent="—";
   $("voiceStatus").textContent="🎤 按住下方按钮说话，松开结束";
   $("voiceConfirmBtn").disabled=true;
   $("voiceHoldBtn").classList.remove("holding");
   $("voiceMask").classList.add("show");
+  warmupMic();
 }
 
 function startHoldVoice(){
@@ -589,10 +606,12 @@ function startHoldVoice(){
   $("voiceHoldBtn").classList.add("holding");
   $("voiceStatus").textContent="🎤 正在聆听… 松开结束";
 
+  clearTimeout(voiceEndTimer);voiceEndTimer=null;
+
   try{
     voiceRec=new SR();
     voiceRec.lang='zh-CN';
-    voiceRec.continuous=true;
+    voiceRec.continuous=false;
     voiceRec.interimResults=true;
     voiceRec.maxAlternatives=1;
 
@@ -612,14 +631,13 @@ function startHoldVoice(){
 
     voiceRec.onerror=(e)=>{
       console.warn("[语音] 错误:",e.error);
+      if(e.error==='aborted')return;
       if(e.error==='not-allowed'||e.error==='service-not-allowed'){
         $("voiceStatus").textContent="❌ 麦克风权限被拒绝，请在浏览器设置中允许";
       }else if(e.error==='no-speech'){
         $("voiceStatus").textContent="⚠️ 没有检测到语音，请再按住试一次";
       }else if(e.error==='network'){
         $("voiceStatus").textContent="❌ 网络错误，请检查网络后重试";
-      }else if(e.error==='aborted'){
-        /* 主动停止触发，忽略 */
       }else{
         $("voiceStatus").textContent="❌ 识别出错："+e.error;
       }
@@ -655,11 +673,15 @@ function stopHoldVoice(){
   voiceHolding=false;
   $("voiceHoldBtn").classList.remove("holding");
   $("voiceStatus").textContent="⏳ 正在识别…";
-  if(voiceRec){try{voiceRec.stop()}catch(e){}}
+  clearTimeout(voiceEndTimer);
+  voiceEndTimer=setTimeout(()=>{
+    if(voiceRec){try{voiceRec.stop()}catch(e){}}
+  },300);
 }
 
 function stopVoiceRecognition(){
   voiceHolding=false;voiceActive=false;
+  clearTimeout(voiceEndTimer);voiceEndTimer=null;
   $("voiceHoldBtn").classList.remove("holding");
   if(voiceRec){try{voiceRec.stop()}catch(e){}try{voiceRec.abort()}catch(e){}voiceRec=null;}
 }
