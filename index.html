@@ -30,15 +30,11 @@
   .log .ok { color: #198754; }
   .log .dup { color: #fd7e14; }
   .log .miss { color: #dc3545; }
-  
-  /* ====== 表格样式：支持横向拖动 ====== */
   table { border-collapse: collapse; font-size: 13px; width: max-content; min-width: 100%; }
   th, td { border: 1px solid #e3e7ee; padding: 7px 8px; text-align: left; white-space: nowrap; }
   th { background: #eef2f8; position: sticky; top: 0; z-index: 1; }
   tr.matched td { background: #ffe3e3 !important; color: #b02a37; font-weight: 700; }
   .table-wrap { max-height: 50vh; overflow: auto; border-radius: 8px; -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y; }
-  /* =================================== */
-
   .hint { color: #666; font-size: 13px; line-height: 1.6; }
   #fileName { font-size: 13px; color: #0b5ed7; margin-left: 6px; word-break: break-all; }
   .toast { position: fixed; left: 50%; bottom: 60px; transform: translateX(-50%); background: rgba(0,0,0,.8); color: #fff; padding: 10px 20px; border-radius: 24px; font-size: 14px; display: none; z-index: 99; max-width: 80vw; text-align: center; }
@@ -114,6 +110,10 @@
   </div>
 </div>
 
+<!-- 用于 Safari 兼容的音频元素 -->
+<audio id="audioOk"   preload="auto"></audio>
+<audio id="audioMiss" preload="auto"></audio>
+
 <script>
 /* ===== 多 CDN 容错加载 ===== */
 var LIBS = {
@@ -170,8 +170,9 @@ let matchColIdx = -1, matchedSet = new Set(), codeIndex = new Map();
 let fileBase = "核对结果";
 const $ = id => document.getElementById(id);
 
-/* ===== 音频处理 ===== */
+/* ===== 音频处理（针对 Safari 深度优化） ===== */
 let audioCtx = null;
+
 function initAudio() {
   if (!audioCtx) {
     const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -180,42 +181,81 @@ function initAudio() {
   if (audioCtx && audioCtx.state === 'suspended') {
     audioCtx.resume();
   }
-}
-function playBeep(type) {
-  if (!audioCtx) return;
+
   try {
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
+    gain.gain.value = 0; 
     osc.connect(gain); gain.connect(audioCtx.destination);
-    if (type === 'ok') {
-      osc.frequency.value = 1200;
-      gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
-      osc.start(); osc.stop(audioCtx.currentTime + 0.15);
-    } else if (type === 'dup') {
-      osc.frequency.value = 800;
-      gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
-      osc.start(); osc.stop(audioCtx.currentTime + 0.1);
-      setTimeout(() => {
-        const osc2 = audioCtx.createOscillator(); const gain2 = audioCtx.createGain();
-        osc2.connect(gain2); gain2.connect(audioCtx.destination);
-        osc2.frequency.value = 800;
-        gain2.gain.setValueAtTime(0.5, audioCtx.currentTime);
-        gain2.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
-        osc2.start(); osc2.stop(audioCtx.currentTime + 0.1);
-      }, 150);
-    } else if (type === 'miss') {
-      osc.frequency.value = 400;
-      gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
-      osc.start(); osc.stop(audioCtx.currentTime + 0.4);
+    osc.start(); osc.stop(audioCtx.currentTime + 0.01);
+  } catch(e) {}
+
+  try {
+    $("audioOk").play().then(()=>$("audioOk").pause()).catch(()=>{});
+  } catch(e) {}
+}
+
+function setupAudioElements() {
+  $("audioOk").src = "data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=";
+  $("audioMiss").src = "data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=";
+}
+
+function playBeep(type) {
+  if (audioCtx && audioCtx.state === 'running') {
+    try {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain); gain.connect(audioCtx.destination);
+      if (type === 'ok') {
+        osc.frequency.value = 1200;
+        gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+        osc.start(); osc.stop(audioCtx.currentTime + 0.15);
+      } else if (type === 'dup') {
+        osc.frequency.value = 800;
+        gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+        osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+        setTimeout(() => {
+          const osc2 = audioCtx.createOscillator(); const gain2 = audioCtx.createGain();
+          osc2.connect(gain2); gain2.connect(audioCtx.destination);
+          osc2.frequency.value = 800;
+          gain2.gain.setValueAtTime(0.5, audioCtx.currentTime);
+          gain2.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+          osc2.start(); osc2.stop(audioCtx.currentTime + 0.1);
+        }, 150);
+      } else if (type === 'miss') {
+        osc.frequency.value = 400;
+        gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+        osc.start(); osc.stop(audioCtx.currentTime + 0.4);
+      }
+    } catch (e) { 
+      fallbackBeep(type);
     }
-  } catch (e) { console.warn("Beep failed", e); }
+  } else {
+    fallbackBeep(type);
+  }
+}
+
+function fallbackBeep(type) {
+  try {
+    if (type === 'ok') {
+      $("audioOk").currentTime = 0;
+      $("audioOk").play().catch(()=>{});
+    } else if (type === 'miss') {
+      $("audioMiss").currentTime = 0;
+      $("audioMiss").play().catch(()=>{});
+    } else {
+      $("audioOk").currentTime = 0;
+      $("audioOk").play().catch(()=>{});
+    }
+  } catch(e) {}
 }
 
 function speak(text){
   try{
+    if (!window.speechSynthesis) return;
     speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
     u.lang = "zh-CN"; u.rate = 1.15; u.volume = 1;
@@ -248,6 +288,8 @@ $("modalMask").onclick = e => { if(e.target === $("modalMask")) $("modalMask").c
 function hasGetUserMedia(){
   return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
 }
+
+setupAudioElements();
 
 /* ---------- 上传解析 ---------- */
 $("btnUpload").onclick = () => {
@@ -324,8 +366,10 @@ function check(code){
     matchedSet.add(hit);
     logMsg("ok", ts + " ✅ 匹配成功：" + code);
     renderTable(); updateStats();
+    
     playBeep('ok');
-    speak("可以送");
+    speak("可以配送"); // 修改：成功语音
+    
     toast("✅ 已标红：" + code);
   } else if(dup){
     logMsg("dup", ts + " ⚠️ 重复扫描：" + code);
@@ -335,7 +379,7 @@ function check(code){
   } else {
     logMsg("miss", ts + " ❌ 未在表格中找到：" + code);
     playBeep('miss');
-    speak("需滞留"); 
+    speak("不可配送，需滞留"); // 修改：失败语音
     toast("❌ 未找到该条码");
   }
   if(matchedSet.size === rows.length && rows.length) speak("核对完成");
@@ -515,7 +559,8 @@ function cameraErrText(e){
 
 $("btnCamera").onclick = async () => {
   if(scanning || starting) return;
-  initAudio();
+  
+  initAudio(); 
 
   if(!hasGetUserMedia()){
     popup("不支持摄像头", "请使用 Chrome 或系统自带浏览器打开，不要用微信内置浏览器。");
