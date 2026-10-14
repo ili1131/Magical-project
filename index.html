@@ -21,7 +21,6 @@
   .btn:disabled { opacity: .45; cursor: not-allowed; }
   .btn-sm { padding: 6px 12px; font-size: 13px; }
 
-  /* 恢复提示横幅 */
   #restoreBanner {
     display: none;
     background: #d1e7dd;
@@ -32,7 +31,6 @@
     font-size: 13px;
     line-height: 1.6;
     margin-bottom: 14px;
-    display: flex;
     align-items: center;
     gap: 8px;
     flex-wrap: wrap;
@@ -98,7 +96,6 @@
 <main>
   <div id="envWarn"></div>
 
-  <!-- 数据恢复横幅 -->
   <div id="restoreBanner">
     <span id="restoreText">💾 已恢复上次核对进度</span>
     <span class="spacer"></span>
@@ -203,45 +200,79 @@ let lastHitRow = -1;
 const $ = id => document.getElementById(id);
 
 /* =========================================================
-   持久化存储：localStorage
-   分开存两份：
-   - 表格主数据（表头、行数据、列索引等）：只有上传时才变
-   - 已核对行号：每次扫码成功后更新，数据量小
+   持久化存储
+   - 表格本体：IndexedDB（异步、大容量、不阻塞主线程）
+   - 已核对行号：localStorage（数据量小，够用）
    ========================================================= */
-const STORAGE_KEY_DATA = "philips_check_data_v1";
-const STORAGE_KEY_MATCHED = "philips_check_matched_v1";
+const DB_NAME = 'philips_check_db';
+const DB_VERSION = 1;
+const DB_STORE = 'table_data';
+const KEY_MATCHED = 'philips_check_matched_v1';
 
-function saveMainData() {
-  try {
-    const data = {
-      headers: headers,
-      rows: rows,
-      matchColIdx: matchColIdx,
-      sheetName: sheetName,
-      fileBase: fileBase,
-      savedAt: Date.now()
+let _dbPromise = null;
+function openDB() {
+  if (_dbPromise) return _dbPromise;
+  _dbPromise = new Promise((resolve, reject) => {
+    if (!window.indexedDB) { reject(new Error("IndexedDB 不可用")); return; }
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(DB_STORE)) {
+        db.createObjectStore(DB_STORE);
+      }
     };
-    localStorage.setItem(STORAGE_KEY_DATA, JSON.stringify(data));
-    return true;
-  } catch(e) {
-    console.warn("保存主数据失败", e);
-    return false;
-  }
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+  return _dbPromise;
+}
+
+function saveTableData(data) {
+  return openDB().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction(DB_STORE, 'readwrite');
+    tx.objectStore(DB_STORE).put(data, 'main');
+    tx.oncomplete = () => resolve(true);
+    tx.onerror = () => reject(tx.error);
+  })).catch(e => { console.warn("保存表格失败", e); return false; });
+}
+
+function loadTableData() {
+  return openDB().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction(DB_STORE, 'readonly');
+    const req = tx.objectStore(DB_STORE).get('main');
+    req.onsuccess = () => resolve(req.result || null);
+    req.onerror = () => reject(req.error);
+  })).catch(e => { console.warn("读取表格失败", e); return null; });
+}
+
+function deleteTableData() {
+  return openDB().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction(DB_STORE, 'readwrite');
+    tx.objectStore(DB_STORE).delete('main');
+    tx.oncomplete = () => resolve(true);
+    tx.onerror = () => reject(tx.error);
+  })).catch(e => { return false; });
 }
 
 function saveMatched() {
   try {
-    localStorage.setItem(STORAGE_KEY_MATCHED, JSON.stringify(Array.from(matchedSet)));
-  } catch(e) {
-    console.warn("保存核对进度失败", e);
-  }
+    localStorage.setItem(KEY_MATCHED, JSON.stringify(Array.from(matchedSet)));
+  } catch(e) { console.warn("保存进度失败", e); }
+}
+function loadMatched() {
+  try {
+    const s = localStorage.getItem(KEY_MATCHED);
+    return s ? JSON.parse(s) : [];
+  } catch(e) { return []; }
+}
+function clearMatched() {
+  try { localStorage.removeItem(KEY_MATCHED); } catch(e) {}
 }
 
-function loadFromStorage() {
+/* 恢复流程 */
+async function tryRestore() {
   try {
-    const dataStr = localStorage.getItem(STORAGE_KEY_DATA);
-    if (!dataStr) return false;
-    const data = JSON.parse(dataStr);
+    const data = await loadTableData();
     if (!data || !data.rows || !data.rows.length) return false;
 
     headers = data.headers || [];
@@ -252,11 +283,10 @@ function loadFromStorage() {
 
     if (matchColIdx < 0 || matchColIdx >= headers.length) return false;
 
-    const matchedArr = JSON.parse(localStorage.getItem(STORAGE_KEY_MATCHED) || "[]");
+    const matchedArr = loadMatched();
     matchedSet = new Set(matchedArr);
     lastHitRow = matchedArr.length ? Math.max.apply(null, matchedArr) : -1;
 
-    // 恢复界面
     $("fileName").textContent = "（已恢复）" + fileBase + ".xlsx";
     $("colBadge").style.display = "inline";
     $("colBadge").textContent = "核对列：" + headers[matchColIdx];
@@ -268,11 +298,8 @@ function loadFromStorage() {
     $("scanCard").style.display = "block";
     $("tableCard").style.display = "block";
 
-    // 显示恢复横幅
-    const savedTime = data.savedAt ? new Date(data.savedAt).toLocaleString() : "上次";
     $("restoreText").innerHTML = "💾 已恢复上次核对进度（" + matchedSet.size + "/" + rows.length + " 已核对）";
     $("restoreBanner").style.display = "flex";
-
     return true;
   } catch(e) {
     console.warn("恢复数据失败", e);
@@ -280,17 +307,10 @@ function loadFromStorage() {
   }
 }
 
-function clearStorage() {
-  try {
-    localStorage.removeItem(STORAGE_KEY_DATA);
-    localStorage.removeItem(STORAGE_KEY_MATCHED);
-  } catch(e) {}
-}
-
-$("btnClearStorage").onclick = () => {
+$("btnClearStorage").onclick = async () => {
   if (!confirm("确定要清除已保存的表格和核对进度吗？此操作不可恢复。")) return;
-  clearStorage();
-  // 重置界面
+  await deleteTableData();
+  clearMatched();
   headers = []; rows = []; matchColIdx = -1;
   matchedSet = new Set(); codeIndex = new Map();
   lastHitRow = -1; fileBase = "核对结果";
@@ -306,7 +326,7 @@ $("btnClearStorage").onclick = () => {
 };
 
 /* =========================================================
-   音频：Web Audio API 生成音效（Safari 兼容）
+   音频（Web Audio API 生成音效，Safari 兼容）
    ========================================================= */
 let audioCtx = null;
 
@@ -335,14 +355,9 @@ function playTone(ctx, freq, durationMs, volume, startTime) {
 function initAudioAndUnlock() {
   const ctx = ensureCtx();
   if (!ctx) return;
-  const fire = () => {
-    playTone(ctx, 1500, 130, 0.35, ctx.currentTime);
-  };
-  if (ctx.state === 'suspended') {
-    ctx.resume().then(fire).catch(fire);
-  } else {
-    fire();
-  }
+  const fire = () => { playTone(ctx, 1500, 130, 0.35, ctx.currentTime); };
+  if (ctx.state === 'suspended') { ctx.resume().then(fire).catch(fire); }
+  else { fire(); }
 }
 
 function playBeep(type) {
@@ -361,11 +376,8 @@ function playBeep(type) {
       playTone(ctx, 400, 500, 0.45, now);
     }
   };
-  if (ctx.state === 'suspended') {
-    ctx.resume().then(fire).catch(fire);
-  } else {
-    fire();
-  }
+  if (ctx.state === 'suspended') { ctx.resume().then(fire).catch(fire); }
+  else { fire(); }
 }
 
 function speak(text){
@@ -411,13 +423,18 @@ function esc(s){
 
 /* ===== 上传解析 ===== */
 $("btnUpload").onclick = () => {
-  // 如果已经有保存的数据，提示会覆盖
-  if (localStorage.getItem(STORAGE_KEY_DATA)) {
-    if (!confirm("检测到上次保存的核对数据。\n\n上传新表格会覆盖旧数据，是否继续？\n\n（如果你想保留旧数据，点取消）")) {
-      return;
+  // 检查是否有保存的数据
+  loadTableData().then(existing => {
+    if (existing && existing.rows && existing.rows.length) {
+      if (!confirm("检测到上次保存的核对数据。\n\n上传新表格会覆盖旧数据，是否继续？\n\n（如果你想保留旧数据，点取消）")) {
+        return;
+      }
     }
-  }
+    pickFile();
+  }).catch(() => { pickFile(); });
+};
 
+function pickFile() {
   const inp = document.createElement("input");
   inp.type = "file"; inp.accept = ".xlsx,.xls,.csv";
   inp.onchange = async e => {
@@ -448,18 +465,33 @@ $("btnUpload").onclick = () => {
 
       matchedSet = new Set();
       lastHitRow = -1;
+      clearMatched();
       buildIndex();
       renderTable(); updateStats();
 
-      // 保存到 localStorage
-      const saved = saveMainData();
-      saveMatched();
-
       $("restoreBanner").style.display = "none";
-
       $("scanCard").style.display = "block";
       $("tableCard").style.display = "block";
-      toast("已读取 " + rows.length + " 行数据", saved ? "已自动保存进度" : "");
+
+      // 界面已经先渲染完了，下一步是后台异步保存
+      toast("已读取 " + rows.length + " 行数据", "正在后台保存进度…");
+
+      // 异步保存到 IndexedDB（不阻塞界面）
+      saveTableData({
+        headers: headers,
+        rows: rows,
+        matchColIdx: matchColIdx,
+        sheetName: sheetName,
+        fileBase: fileBase,
+        savedAt: Date.now()
+      }).then(ok => {
+        if (ok) {
+          toast("已读取 " + rows.length + " 行数据", "✅ 进度已保存，可放心关闭");
+        } else {
+          toast("已读取 " + rows.length + " 行数据", "⚠️ 进度保存失败，请勿关闭页面");
+        }
+      });
+
     } catch(err) {
       console.error(err);
       toast("读取失败", String(err && err.message || err));
@@ -469,7 +501,7 @@ $("btnUpload").onclick = () => {
     }
   };
   inp.click();
-};
+}
 
 function buildIndex(){
   codeIndex = new Map();
@@ -535,7 +567,7 @@ function check(code){
     lastHitRow = hit;
     logMsg("ok", ts + " ✅ 匹配成功：" + code);
     renderTable(); updateStats();
-    saveMatched(); // 每次核对成功后立即保存进度
+    saveMatched(); // 每核对成功一个立即保存（小数据，很快）
 
     playBeep('ok');
     speak("可以配送");
@@ -802,17 +834,8 @@ $("btnExport").onclick = async () => {
   }catch(err){ toast("导出失败", err.message); }
 };
 
-/* ===== 页面加载时尝试恢复上次数据 ===== */
-(function tryRestore(){
-  // 等 XLSX 加载完后尝试恢复（其实不需要 XLSX，但保持顺序）
-  setTimeout(function(){
-    const ok = loadFromStorage();
-    if (ok) {
-      // 静默恢复，不弹提示
-      console.log("已从 localStorage 恢复上次核对进度");
-    }
-  }, 100);
-})();
+/* ===== 页面加载后尝试恢复上次数据（异步，不阻塞界面） ===== */
+setTimeout(function(){ tryRestore(); }, 200);
 </script>
 </body>
 </html>
