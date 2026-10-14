@@ -673,11 +673,13 @@ if(matchColIdx===-1){rows.forEach((row,i)=>{row.forEach((val,j)=>{evalCell(i,j,v
 else if(matchColIdx>=0){rows.forEach((row,i)=>{evalCell(i,matchColIdx,row[matchColIdx])})}
 candidates.sort((a,b)=>b.score-a.score);return candidates.slice(0,5)}
 
-/* ============ 语音识别（含 Kimi 修复方案） ============ */
+/* ============ 语音识别（快照 + 看门狗兜底） ============ */
 let voiceRec=null,voiceRawText="",voiceDisplayText="",voiceNormalizedText="",voiceActive=false;
 let voiceHolding=false;
 let voiceStream=null;
 let voiceEndTimer=null;
+let voiceWatchdog=null;
+let lastTranscript="";
 
 function getSpeechRecognitionClass(){return window.SpeechRecognition||window.webkitSpeechRecognition||null}
 function isSpeechRecognitionSupported(){const SR=getSpeechRecognitionClass();if(!SR)return false;return true}
@@ -692,14 +694,30 @@ async function warmupMic(){
   }catch(e){console.warn("[语音] 预热麦克风失败:",e);return false}
 }
 
-// ★ 识别前：让出音频焦点，避免 Android 上被提示音挤掉
 function pauseAppAudio(){
   try{if(window.speechSynthesis)speechSynthesis.cancel()}catch(e){}
   try{if(audioCtx&&audioCtx.state==='running')audioCtx.suspend()}catch(e){}
 }
-// ★ 识别结束：恢复提示音
 function resumeAppAudio(){
   try{if(audioCtx&&audioCtx.state==='suspended')audioCtx.resume()}catch(e){}
+}
+
+function finishVoiceRecognition(){
+  clearTimeout(voiceWatchdog);voiceWatchdog=null;
+  clearTimeout(voiceEndTimer);voiceEndTimer=null;
+  voiceHolding=false;
+  $("voiceHoldBtn").classList.remove("holding");
+  const finalText=(lastTranscript||voiceRawText||voiceDisplayText||"").trim();
+  const norm=basicNormalize(finalText);
+  voiceNormalizedText=norm;
+  if(norm){
+    $("voiceStatus").textContent="✅ 识别完成，请点「查找匹配」";
+    $("voiceConfirmBtn").disabled=false;
+  }else{
+    $("voiceStatus").textContent="⚠️ 没有识别到内容，请再按住试一次";
+    $("voiceConfirmBtn").disabled=true;
+  }
+  resumeAppAudio();
 }
 
 function openVoicePanel(){
@@ -708,7 +726,9 @@ function openVoicePanel(){
     return;
   }
   voiceRawText="";voiceDisplayText="";voiceNormalizedText="";voiceActive=false;voiceHolding=false;
+  lastTranscript="";
   clearTimeout(voiceEndTimer);voiceEndTimer=null;
+  clearTimeout(voiceWatchdog);voiceWatchdog=null;
   $("voiceRawText").textContent="（等待语音…）";
   $("voiceNormalizedText").textContent="—";
   $("voiceStatus").textContent="🎤 按住下方按钮说话，松开结束";
@@ -726,8 +746,9 @@ function startHoldVoice(){
   $("voiceHoldBtn").classList.add("holding");
   $("voiceStatus").textContent="🎤 正在聆听… 松开结束";
   clearTimeout(voiceEndTimer);voiceEndTimer=null;
-  voiceDisplayText="";voiceRawText="";
-  pauseAppAudio();   // ★ 关键：识别前挂起 AudioContext、停掉语音播报
+  clearTimeout(voiceWatchdog);voiceWatchdog=null;
+  voiceDisplayText="";voiceRawText="";lastTranscript="";
+  pauseAppAudio();
   startVoiceRec();
 }
 
@@ -747,6 +768,7 @@ function startVoiceRec(){
       }
       const displayRaw=voiceRawText+interim;
       voiceDisplayText=displayRaw;
+      lastTranscript=displayRaw;
       const norm=basicNormalize(displayRaw);
       $("voiceRawText").textContent=displayRaw||"（等待语音…）";
       $("voiceNormalizedText").textContent=norm||"—";
@@ -754,38 +776,41 @@ function startVoiceRec(){
     };
     voiceRec.onerror=(e)=>{
       console.warn("[语音] 错误:",e.error);
-      if(e.error==='aborted')return;
+      if(e.error==='aborted'){
+        if(!voiceHolding)finishVoiceRecognition();
+        return;
+      }
       if(e.error==='not-allowed'||e.error==='service-not-allowed'){
         $("voiceStatus").textContent="❌ 麦克风权限被拒绝，请在浏览器设置中允许";
-      }else if(e.error==='no-speech'){
-        $("voiceStatus").textContent="⚠️ 没有检测到语音，请再按住试一次";
-      }else if(e.error==='network'){
-        // ★ 原因 C：安卓 Chrome 识别要连 Google 服务器
-        $("voiceStatus").textContent="❌ 网络无法连接语音服务（安卓需能访问 Google），请改用扫码或 iPhone";
-      }else{
-        $("voiceStatus").textContent="❌ 识别出错："+e.error;
+        if(!voiceHolding)finishVoiceRecognition();
+        return;
       }
+      if(e.error==='no-speech'){
+        if(voiceHolding){
+          $("voiceStatus").textContent="🎤 正在聆听… 松开结束";
+        }else{
+          $("voiceStatus").textContent="⚠️ 没有检测到语音，请再按住试一次";
+          finishVoiceRecognition();
+        }
+        return;
+      }
+      if(e.error==='network'){
+        $("voiceStatus").textContent="❌ 网络无法连接语音服务（安卓需能访问 Google），请改用扫码或 iPhone";
+        if(!voiceHolding)finishVoiceRecognition();
+        return;
+      }
+      $("voiceStatus").textContent="❌ 识别出错："+e.error;
+      if(!voiceHolding)finishVoiceRecognition();
     };
     voiceRec.onend=()=>{
-      resumeAppAudio();   // ★ 恢复提示音
       voiceActive=false;
       if(voiceHolding){
-        // ★ 关键：Android Chrome 会自动掐断会话，按住期间自动重启
+        resumeAppAudio();
         $("voiceStatus").textContent="🎤 正在聆听… 松开结束";
         setTimeout(()=>{if(voiceHolding)startVoiceRec();},200);
         return;
       }
-      $("voiceHoldBtn").classList.remove("holding");
-      const finalText=(voiceRawText||voiceDisplayText||"").trim();
-      const norm=basicNormalize(finalText);
-      voiceNormalizedText=norm;
-      if(norm){
-        $("voiceStatus").textContent="✅ 识别完成，请点「查找匹配」";
-        $("voiceConfirmBtn").disabled=false;
-      }else{
-        $("voiceStatus").textContent="⚠️ 没有识别到内容，请再按住试一次";
-        $("voiceConfirmBtn").disabled=true;
-      }
+      finishVoiceRecognition();
     };
     voiceRec.start();
     voiceActive=true;
@@ -799,16 +824,23 @@ function startVoiceRec(){
 
 function stopHoldVoice(){
   if(!voiceHolding)return;
-  voiceHolding=false;              // 先复位标志，onend 才不会自动重启
+  voiceHolding=false;
   $("voiceHoldBtn").classList.remove("holding");
+  lastTranscript=(lastTranscript||voiceRawText||voiceDisplayText||"").trim();
   $("voiceStatus").textContent="⏳ 正在识别…";
   clearTimeout(voiceEndTimer);
   voiceEndTimer=setTimeout(()=>{if(voiceRec){try{voiceRec.stop()}catch(e){}}},300);
+  clearTimeout(voiceWatchdog);
+  voiceWatchdog=setTimeout(()=>{
+    console.warn("[语音] 看门狗触发：强制结束识别");
+    finishVoiceRecognition();
+  },1500);
 }
 
 function stopVoiceRecognition(){
   voiceHolding=false;voiceActive=false;
   clearTimeout(voiceEndTimer);voiceEndTimer=null;
+  clearTimeout(voiceWatchdog);voiceWatchdog=null;
   $("voiceHoldBtn").classList.remove("holding");
   if(voiceRec){try{voiceRec.abort()}catch(e){}voiceRec=null}
   resumeAppAudio();
@@ -825,12 +857,11 @@ $("voiceCancelBtn").onclick=()=>{closeVoicePanel()};
   holdBtn.addEventListener("pointerdown",function(e){e.preventDefault();startHoldVoice()});
   holdBtn.addEventListener("pointerup",function(e){e.preventDefault();stopHoldVoice()});
   holdBtn.addEventListener("pointercancel",function(e){e.preventDefault();stopHoldVoice()});
-  // ★ 已移除 pointerleave，避免手指轻微滑动就停止识别
   holdBtn.addEventListener("contextmenu",function(e){e.preventDefault()});
 })();
 
 $("voiceConfirmBtn").onclick=()=>{
-  const raw=((voiceRawText||voiceDisplayText)||"").trim();
+  const raw=((lastTranscript||voiceRawText||voiceDisplayText)||"").trim();
   if(!raw){toast("提示","没有可提交的内容");return}
   stopVoiceRecognition();
   $("voiceMask").classList.remove("show");
