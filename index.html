@@ -12,7 +12,11 @@
   .badge { background: rgba(255,255,255,.2); border-radius: 20px; padding: 3px 10px; font-size: 12px; }
   main { max-width: 960px; margin: 0 auto; padding: 14px; }
   .card { background: #fff; border-radius: 12px; padding: 14px; margin-bottom: 14px; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
-  .btn { display: inline-block; border: none; border-radius: 10px; padding: 12px 18px; font-size: 15px; cursor: pointer; margin: 4px 4px 4px 0; font-weight: 600; }
+
+  /* ====== 按钮通用 ====== */
+  .btn { display: inline-block; border: none; border-radius: 10px; padding: 12px 18px; font-size: 15px; cursor: pointer; font-weight: 600; font-family: inherit; }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .btn-sm { padding: 6px 12px; font-size: 13px; }
   .btn-primary { background: #0b5ed7; color: #fff; }
   .btn-success { background: #198754; color: #fff; }
   .btn-danger  { background: #dc3545; color: #fff; }
@@ -20,8 +24,25 @@
   .btn-warning { background: #fd7e14; color: #fff; }
   .btn-info { background: #0dcaf0; color: #05323a; }
   .btn-dark { background: #343a40; color: #fff; }
-  .btn:disabled { opacity: .45; cursor: not-allowed; }
-  .btn-sm { padding: 6px 12px; font-size: 13px; }
+
+  /* ====== 按钮网格：整齐排列 ====== */
+  .btn-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .btn-grid .btn {
+    margin: 0;
+    width: 100%;
+    padding: 14px 8px;
+    font-size: 14px;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.2;
+  }
+  .btn-grid .btn.span-2 { grid-column: 1 / -1; }
 
   #restoreBanner {
     display: none;
@@ -39,18 +60,23 @@
   }
   #restoreBanner .spacer { flex: 1; }
 
-  .stats { display: flex; gap: 10px; flex-wrap: wrap; }
-  .stat { flex: 1; min-width: 90px; background: #f0f4fa; border-radius: 10px; padding: 10px; text-align: center; }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .stat { background: #f0f4fa; border-radius: 10px; padding: 10px; text-align: center; }
   .stat b { display: block; font-size: 22px; }
-  #reader { position: relative; width: 100%; max-width: 480px; margin: 10px auto 0; display: none; border-radius: 10px; overflow: hidden; background: #000; }
+
+  #readerWrap { display: none; margin-bottom: 14px; }
+  #reader { position: relative; width: 100%; max-width: 480px; margin: 0 auto; border-radius: 10px; overflow: hidden; background: #000; }
   #reader video { width: 100%; display: block; background: #000; object-fit: cover; }
   .scan-frame { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 82%; height: 40%; border: 2px solid rgba(255,80,80,.9); border-radius: 10px; box-shadow: 0 0 0 9999px rgba(0,0,0,.2); pointer-events: none; z-index: 10; }
   .scan-frame::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 2px; background: rgba(255,80,80,.85); animation: scanline 2s ease-in-out infinite; }
   @keyframes scanline { 0%,100% { top: 8%; } 50% { top: 92%; } }
-  .log { max-height: 180px; overflow-y: auto; font-size: 13px; margin-top: 10px; border-top: 1px dashed #ddd; padding-top: 8px; }
+
+  #logCard { display: none; }
+  .log { max-height: 180px; overflow-y: auto; font-size: 13px; }
   .log .ok { color: #198754; }
   .log .dup { color: #fd7e14; }
   .log .miss { color: #dc3545; }
+
   table { border-collapse: collapse; font-size: 13px; width: max-content; min-width: 100%; }
   th, td { border: 1px solid #e3e7ee; padding: 7px 8px; text-align: left; white-space: nowrap; }
   th { background: #eef2f8; position: sticky; top: 0; z-index: 1; }
@@ -58,6 +84,8 @@
   .table-wrap { max-height: 50vh; overflow: auto; border-radius: 8px; -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y; }
   .hint { color: #666; font-size: 13px; line-height: 1.6; }
   #fileName { font-size: 13px; color: #0b5ed7; margin-left: 6px; word-break: break-all; }
+  #uploadBusy { display: none; margin-left: 8px; font-size: 13px; color: #0b5ed7; }
+
   .toast {
     position: fixed; left: 50%; bottom: 60px; transform: translateX(-50%);
     background: rgba(0,0,0,.88); color: #fff; padding: 14px 22px; border-radius: 18px;
@@ -70,7 +98,6 @@
   .spinner { width: 36px; height: 36px; border: 4px solid #dbe4f0; border-top-color: #0b5ed7; border-radius: 50%; animation: spin 1s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
   #loadRetry { display: none; }
-  #uploadBusy { display: none; margin-left: 8px; font-size: 13px; color: #0b5ed7; }
   #envWarn { display: none; background: #fff3cd; color: #7a5b00; border: 1px solid #ffe69c; border-radius: 10px; padding: 10px 12px; font-size: 13px; line-height: 1.6; margin-bottom: 14px; }
   #envWarn b { color: #b02a37; }
   #modalMask { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: none; align-items: center; justify-content: center; z-index: 200; padding: 18px; }
@@ -80,6 +107,31 @@
   #modal .mbody { font-size: 14px; line-height: 1.7; color: #333; white-space: pre-wrap; word-break: break-word; }
   #modal .mbody code { background: #f0f4fa; padding: 1px 5px; border-radius: 4px; font-size: 12px; word-break: break-all; }
   #modal .mfoot { text-align: right; margin-top: 16px; }
+
+  #colPickerMask {
+    position: fixed; inset: 0; background: rgba(0,0,0,.5);
+    display: none; align-items: center; justify-content: center;
+    z-index: 300; padding: 18px;
+  }
+  #colPickerMask.show { display: flex; }
+  #colPicker {
+    background: #fff; border-radius: 14px; max-width: 480px; width: 100%;
+    padding: 20px; box-shadow: 0 8px 30px rgba(0,0,0,.25);
+    max-height: 82vh; display: flex; flex-direction: column;
+  }
+  #colPicker h3 { margin: 0 0 6px; font-size: 16px; color: #0b5ed7; }
+  .colPickerHint { font-size: 12px; color: #666; margin-bottom: 12px; }
+  #colPickerList { overflow-y: auto; flex: 1; -webkit-overflow-scrolling: touch; }
+  .colPickBtn {
+    display: block; width: 100%; text-align: left;
+    padding: 12px 14px; margin-bottom: 8px;
+    border: 2px solid #e3e7ee; border-radius: 10px;
+    background: #f8fafc; font-size: 14px; font-weight: 600;
+    cursor: pointer; color: #1a1a2e; font-family: inherit;
+  }
+  .colPickBtn:active { background: #e0ecff; border-color: #0b5ed7; }
+  .colPickBtn.current { border-color: #0b5ed7; background: #e0ecff; }
+  .colPickBtn .idx { color: #0b5ed7; margin-right: 8px; font-size: 12px; font-weight: 700; }
 </style>
 </head>
 <body>
@@ -103,19 +155,30 @@
     <button class="btn btn-sm btn-danger" id="btnClearStorage">清除保存的数据</button>
   </div>
 
+  <!-- ====== 统一控制面板：所有按钮集中在这里，整齐网格排列 ====== -->
   <div class="card">
-    <button class="btn btn-primary" id="btnUpload" disabled>Excel</button>
-    <span id="fileName"></span>
-    <span id="uploadBusy">⏳ 正在解析表格…</span>
+    <div class="btn-grid">
+      <button class="btn btn-primary" id="btnUpload" disabled>Excel</button>
+      <button class="btn btn-success need-data" id="btnCamera" style="display:none">摄像头</button>
+      <button class="btn btn-danger" id="btnStop" style="display:none">停止扫描</button>
+      <button class="btn btn-secondary need-data" id="btnChangeCol" style="display:none">更换核对列</button>
+      <button class="btn btn-warning need-data" id="btnLocate" style="display:none">📍 定位最后核对项</button>
+      <button class="btn btn-info need-data" id="btnExport" style="display:none">导出全部</button>
+      <button class="btn btn-info need-data" id="btnExportMatched" style="display:none">已扫描</button>
+      <button class="btn btn-dark need-data span-2" id="btnExportLog" style="display:none">运行日志</button>
+    </div>
+    <div style="margin-top:10px; min-height:18px;">
+      <span id="fileName"></span>
+      <span id="uploadBusy">⏳ 正在解析表格…</span>
+    </div>
   </div>
 
-  <div class="card" id="scanCard" style="display:none">
-    <button class="btn btn-success" id="btnCamera">摄像头</button>
-    <button class="btn btn-danger" id="btnStop" style="display:none">停止扫描</button>
+  <!-- 摄像头画面 -->
+  <div id="readerWrap">
     <div id="reader"></div>
-    <div class="log" id="log"></div>
   </div>
 
+  <!-- 统计 -->
   <div class="card" id="statCard" style="display:none">
     <div class="stats">
       <div class="stat">总数<b id="stTotal">0</b></div>
@@ -124,13 +187,15 @@
     </div>
   </div>
 
+  <!-- 日志 -->
+  <div class="card" id="logCard">
+    <div class="log" id="log"></div>
+  </div>
+
+  <!-- 表格 -->
   <div class="card" id="tableCard" style="display:none">
-    <button class="btn btn-success" id="btnExport">导出全部（带标红）</button>
-    <button class="btn btn-info" id="btnExportMatched">已扫描</button>
-    <button class="btn btn-dark" id="btnExportLog">运行日志</button>
-    <button class="btn btn-warning" id="btnLocate">📍 定位最后核对项</button>
+    <div class="table-wrap"><table id="grid"></table></div>
     <span id="exportName" class="hint"></span>
-    <div class="table-wrap" style="margin-top:10px"><table id="grid"></table></div>
   </div>
 </main>
 
@@ -141,6 +206,14 @@
     <h3 id="modalTitle">提示</h3>
     <div class="mbody" id="modalBody"></div>
     <div class="mfoot"><button class="btn btn-primary" id="modalOk">知道了</button></div>
+  </div>
+</div>
+
+<div id="colPickerMask">
+  <div id="colPicker">
+    <h3>请选择要核对的列</h3>
+    <div class="colPickerHint">点击下方任意列名，该列将作为扫码核对的目标</div>
+    <div id="colPickerList"></div>
   </div>
 </div>
 
@@ -198,13 +271,21 @@ let checkLog = [];
 const $ = id => document.getElementById(id);
 
 /* =========================================================
+   按钮显示控制
+   ========================================================= */
+function showDataButtons(show) {
+  document.querySelectorAll(".need-data").forEach(el => {
+    el.style.display = show ? "" : "none";
+  });
+}
+
+/* =========================================================
    IndexedDB
    ========================================================= */
 const DB_NAME = 'philips_check_db';
 const DB_VERSION = 1;
 const DB_STORE = 'table_data';
 const KEY_MATCHED = 'philips_check_matched_v1';
-const KEY_LOG = 'philips_check_log_v1';
 
 let _dbPromise = null;
 function openDB() {
@@ -214,77 +295,53 @@ function openDB() {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = () => {
       const db = req.result;
-      if (!db.objectStoreNames.contains(DB_STORE)) {
-        db.createObjectStore(DB_STORE);
-      }
+      if (!db.objectStoreNames.contains(DB_STORE)) db.createObjectStore(DB_STORE);
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
   });
   return _dbPromise;
 }
-
-function saveTableData(data) {
+function dbPut(key, value) {
   return openDB().then(db => new Promise((resolve, reject) => {
     const tx = db.transaction(DB_STORE, 'readwrite');
-    tx.objectStore(DB_STORE).put(data, 'main');
+    tx.objectStore(DB_STORE).put(value, key);
     tx.oncomplete = () => resolve(true);
     tx.onerror = () => reject(tx.error);
-  })).catch(e => { console.warn("保存表格失败", e); return false; });
+  })).catch(e => { console.warn("dbPut失败", key, e); return false; });
 }
-
-function loadTableData() {
+function dbGet(key) {
   return openDB().then(db => new Promise((resolve, reject) => {
     const tx = db.transaction(DB_STORE, 'readonly');
-    const req = tx.objectStore(DB_STORE).get('main');
-    req.onsuccess = () => resolve(req.result || null);
+    const req = tx.objectStore(DB_STORE).get(key);
+    req.onsuccess = () => resolve(req.result === undefined ? null : req.result);
     req.onerror = () => reject(req.error);
-  })).catch(e => { console.warn("读取表格失败", e); return null; });
+  })).catch(e => { console.warn("dbGet失败", key, e); return null; });
 }
-
-function deleteTableData() {
+function dbDelete(key) {
   return openDB().then(db => new Promise((resolve, reject) => {
     const tx = db.transaction(DB_STORE, 'readwrite');
-    tx.objectStore(DB_STORE).delete('main');
+    tx.objectStore(DB_STORE).delete(key);
     tx.oncomplete = () => resolve(true);
     tx.onerror = () => reject(tx.error);
   })).catch(e => false);
 }
 
+function saveTableData(data) { return dbPut('main', data); }
+function loadTableData() { return dbGet('main'); }
+function deleteTableData() { return dbDelete('main'); }
+function saveLogToDB() { return dbPut('log', checkLog.slice(-5000)); }
+function loadLogFromDB() { return dbGet('log').then(v => Array.isArray(v) ? v : []); }
+function deleteLogFromDB() { return dbDelete('log'); }
+
 function saveMatched() {
-  try {
-    localStorage.setItem(KEY_MATCHED, JSON.stringify(Array.from(matchedSet)));
-  } catch(e) { console.warn("保存进度失败", e); }
+  try { localStorage.setItem(KEY_MATCHED, JSON.stringify(Array.from(matchedSet))); } catch(e) {}
 }
 function loadMatched() {
-  try {
-    const s = localStorage.getItem(KEY_MATCHED);
-    return s ? JSON.parse(s) : [];
-  } catch(e) { return []; }
+  try { const s = localStorage.getItem(KEY_MATCHED); return s ? JSON.parse(s) : []; } catch(e) { return []; }
 }
 function clearMatched() {
   try { localStorage.removeItem(KEY_MATCHED); } catch(e) {}
-}
-
-function saveLog() {
-  try {
-    const toSave = checkLog.slice(-5000);
-    localStorage.setItem(KEY_LOG, JSON.stringify(toSave));
-  } catch(e) {
-    console.warn("保存日志失败", e);
-    try {
-      localStorage.setItem(KEY_LOG, JSON.stringify(checkLog.slice(-1000)));
-    } catch(e2) {}
-  }
-}
-function loadLogFromStorage() {
-  try {
-    const s = localStorage.getItem(KEY_LOG);
-    return s ? JSON.parse(s) : [];
-  } catch(e) { return []; }
-}
-function clearLog() {
-  try { localStorage.removeItem(KEY_LOG); } catch(e) {}
 }
 
 /* =========================================================
@@ -362,6 +419,7 @@ function logMsg(cls, msg){
   d.className = cls;
   d.textContent = msg;
   $("log").prepend(d);
+  $("logCard").style.display = "block";
 }
 function popup(title, bodyHtml){
   $("modalTitle").textContent = title;
@@ -378,14 +436,28 @@ function esc(s){
   return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 }
 
-/* =========================================================
-   上传
-   ========================================================= */
+/* ===== 列选择 ===== */
+function pickColumn(currentIdx, callback) {
+  const mask = $("colPickerMask");
+  const list = $("colPickerList");
+  list.innerHTML = "";
+  headers.forEach((h, i) => {
+    const btn = document.createElement("button");
+    btn.className = "colPickBtn" + (i === currentIdx ? " current" : "");
+    btn.innerHTML = '<span class="idx">第' + (i + 1) + '列</span>' + esc(h || "(空标题)");
+    btn.onclick = () => {
+      mask.classList.remove("show");
+      callback(i);
+    };
+    list.appendChild(btn);
+  });
+  mask.classList.add("show");
+}
+
+/* ===== 上传 ===== */
 $("btnUpload").onclick = () => {
   if (hasSavedData) {
-    if (!confirm("检测到上次保存的核对数据。\n\n上传新表格会覆盖旧数据，是否继续？\n\n（如果想保留旧数据，点取消）")) {
-      return;
-    }
+    if (!confirm("检测到上次保存的核对数据。\n\n上传新表格会覆盖旧数据，是否继续？\n\n（如果想保留旧数据，点取消）")) return;
   }
   pickFile();
 };
@@ -414,53 +486,74 @@ function pickFile() {
 
       headers = arr[0].map(h => String(h).trim());
       rows = arr.slice(1).filter(r => r.some(c => String(c).trim() !== ""));
-      matchColIdx = headers.findIndex(h => h.toUpperCase() === "RML/RMD");
-      if (matchColIdx < 0) matchColIdx = headers.findIndex(h => h.replace(/\s/g, "").toUpperCase().includes("RML"));
-      if (matchColIdx < 0) { toast("提示", "未找到 RML/RMD 列，请检查表头"); return; }
+      if (!headers.length) { toast("提示", "表格没有表头"); return; }
 
-      $("colBadge").style.display = "inline";
-      $("colBadge").textContent = "核对列：" + headers[matchColIdx];
+      $("uploadBusy").style.display = "none";
+      $("btnUpload").disabled = false;
 
-      matchedSet = new Set();
-      lastHitRow = -1;
-      checkLog = [];
-      clearMatched();
-      clearLog();
-      buildIndex();
-      renderTable(); updateStats();
+      pickColumn(-1, function(idx) {
+        matchColIdx = idx;
 
-      $("restoreBanner").style.display = "none";
-      $("scanCard").style.display = "block";
-      $("tableCard").style.display = "block";
+        $("colBadge").style.display = "inline";
+        $("colBadge").textContent = "核对列：" + (headers[idx] || "第" + (idx + 1) + "列");
 
-      toast("已读取 " + rows.length + " 行数据", "正在后台保存进度…");
+        matchedSet = new Set();
+        lastHitRow = -1;
+        clearMatched();
+        buildIndex();
+        renderTable(); updateStats();
 
-      saveTableData({
-        headers: headers,
-        rows: rows,
-        matchColIdx: matchColIdx,
-        sheetName: sheetName,
-        fileBase: fileBase,
-        savedAt: Date.now()
-      }).then(ok => {
-        hasSavedData = ok;
-        if (ok) {
-          toast("已读取 " + rows.length + " 行数据", "✅ 进度已保存，可放心关闭");
-        } else {
-          toast("已读取 " + rows.length + " 行数据", "⚠️ 进度保存失败，请勿关闭页面");
-        }
+        $("restoreBanner").style.display = "none";
+        showDataButtons(true);
+        $("statCard").style.display = "block";
+        $("tableCard").style.display = "block";
+        $("btnCamera").style.display = "";
+        $("btnStop").style.display = "none";
+
+        toast("已读取 " + rows.length + " 行数据", "正在后台保存进度…");
+
+        saveTableData({
+          headers: headers, rows: rows, matchColIdx: matchColIdx,
+          sheetName: sheetName, fileBase: fileBase, savedAt: Date.now()
+        }).then(ok => {
+          hasSavedData = ok;
+          if (ok) toast("核对列：" + (headers[idx] || ""), "✅ 进度已保存，可放心关闭");
+          else    toast("核对列：" + (headers[idx] || ""), "⚠️ 进度保存失败，请勿关闭页面");
+        });
       });
 
     } catch (err) {
       console.error(err);
       toast("读取失败", String(err && err.message || err));
-    } finally {
       $("uploadBusy").style.display = "none";
       $("btnUpload").disabled = false;
     }
   };
   inp.click();
 }
+
+/* 更换核对列 */
+$("btnChangeCol").onclick = () => {
+  if (!headers.length) return;
+  if (!confirm("更换核对列会清空当前核对进度，是否继续？")) return;
+  pickColumn(matchColIdx, function(idx) {
+    matchColIdx = idx;
+    $("colBadge").style.display = "inline";
+    $("colBadge").textContent = "核对列：" + (headers[idx] || "第" + (idx + 1) + "列");
+
+    matchedSet = new Set();
+    lastHitRow = -1;
+    clearMatched();
+    buildIndex();
+    renderTable(); updateStats();
+
+    saveTableData({
+      headers: headers, rows: rows, matchColIdx: matchColIdx,
+      sheetName: sheetName, fileBase: fileBase, savedAt: Date.now()
+    });
+    toast("已切换核对列", headers[idx] || "");
+  });
+};
 
 function buildIndex(){
   codeIndex = new Map();
@@ -471,7 +564,6 @@ function buildIndex(){
     codeIndex.get(k).push(i);
   });
 }
-
 function renderTable(){
   let html = "<tr>" + headers.map(h=>"<th>"+esc(h)+"</th>").join("") + "</tr>";
   rows.forEach((r,i)=>{
@@ -520,7 +612,7 @@ function addLog(code, result, info) {
     String(d.getMinutes()).padStart(2,'0') + ":" +
     String(d.getSeconds()).padStart(2,'0');
   checkLog.push({ time: timeStr, code: code, result: result, info: info || "" });
-  saveLog();
+  saveLogToDB();
 }
 
 function check(code){
@@ -538,13 +630,10 @@ function check(code){
     logMsg("ok", ts + " ✅ 匹配成功：" + code);
     renderTable(); updateStats();
     saveMatched();
-
     const info = getRowInfo(hit);
     addLog(code, "成功", info);
-
     playBeep('ok');
     speak("可以配送");
-
     toast("✅ 已核对 · 可以配送", info);
   } else if(dup){
     logMsg("dup", ts + " ⚠️ 重复扫描：" + code);
@@ -578,7 +667,7 @@ function emitCode(code){
   check(code);
 }
 
-const WANTED_FORMATS = ["ean_13","ean_8","upc_a","upc_e","code_128","code_39","code_93", "itf","codabar","qr_code"];
+const WANTED_FORMATS = ["ean_13","ean_8","upc_a","upc_e","code_128","code_39","code_93","itf","codabar","qr_code"];
 
 async function makeDetector(){
   if(!("BarcodeDetector" in window)) return null;
@@ -589,7 +678,6 @@ async function makeDetector(){
   }catch(e){}
   return null;
 }
-
 async function tuneTrack(track){
   if(!track) return;
   const caps = (track.getCapabilities ? track.getCapabilities() : {}) || {};
@@ -599,7 +687,6 @@ async function tuneTrack(track){
   if(adv.length){ try{ await track.applyConstraints({ advanced: adv }); }catch(e){} }
   try{ await track.applyConstraints({ width: { ideal: 3840 }, height: { ideal: 2160 } }); }catch(e){}
 }
-
 async function startNativeScan(){
   const det = await makeDetector();
   if(!det) throw new Error("no-native-detector");
@@ -659,7 +746,6 @@ async function startNativeScan(){
   scanLoop();
   return true;
 }
-
 async function scanLoop(){
   if(!scanning || !nativeDetector || !camVideo) return;
   if(!loopBusy && camVideo.readyState >= 2 && camVideo.videoWidth > 0){
@@ -674,7 +760,6 @@ async function scanLoop(){
   }
   scanTimer = setTimeout(scanLoop, 80);
 }
-
 async function startFallbackScan(){
   if(typeof Html5Qrcode === "undefined") throw new Error("扫码库未加载");
   fallbackMode = true;
@@ -690,7 +775,6 @@ async function startFallbackScan(){
   await boostStreamResolution();
   scanning = true;
 }
-
 async function boostStreamResolution(){
   const v = $("reader").querySelector("video");
   if(!v || !v.srcObject) return;
@@ -698,12 +782,10 @@ async function boostStreamResolution(){
   if(!t) return;
   try{ await t.applyConstraints({ width: { ideal: 1920 }, height: { ideal: 1080 }, advanced: [{ focusMode: "continuous" }] }); }catch(e){}
 }
-
 function stopCamStream(){
   if(camStream){ try{ camStream.getTracks().forEach(t => t.stop()); }catch(e){} }
   camStream = null; camTrack = null; camVideo = null; nativeDetector = null;
 }
-
 async function stopScan(){
   scanning = false;
   if(scanTimer){ clearTimeout(scanTimer); scanTimer = null; }
@@ -715,11 +797,10 @@ async function stopScan(){
   stopCamStream();
   const el = $("reader");
   el.innerHTML = "";
-  el.style.display = "none";
-  $("btnCamera").style.display = "inline-block";
+  $("readerWrap").style.display = "none";
+  $("btnCamera").style.display = "";
   $("btnStop").style.display = "none";
 }
-
 function cameraErrText(e){
   const name = (e && e.name) || "";
   const raw  = (e && e.message) ? e.message : String(e || "");
@@ -735,14 +816,13 @@ function cameraErrText(e){
 $("btnCamera").onclick = async () => {
   if(scanning || starting) return;
   initAudioAndUnlock();
-
   if(!hasGetUserMedia()){
     popup("不支持摄像头", "请使用 Chrome 或系统自带浏览器打开，不要用微信内置浏览器。");
     return;
   }
   starting = true;
   $("btnCamera").disabled = true;
-  $("reader").style.display = "block";
+  $("readerWrap").style.display = "block";
 
   try{
     let ok = false;
@@ -755,10 +835,9 @@ $("btnCamera").onclick = async () => {
       }
     }
     if(!ok){ await startFallbackScan(); }
-
     scanning = true;
     $("btnCamera").style.display = "none";
-    $("btnStop").style.display = "inline-block";
+    $("btnStop").style.display = "";
   }catch(e){
     await stopScan();
     popup("无法开启相机", cameraErrText(e));
@@ -767,7 +846,6 @@ $("btnCamera").onclick = async () => {
     $("btnCamera").disabled = false;
   }
 };
-
 $("btnStop").onclick = () => { stopScan(); };
 
 /* =========================================================
@@ -775,26 +853,15 @@ $("btnStop").onclick = () => { stopScan(); };
    ========================================================= */
 function getTodayStr() {
   const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return y + "-" + m + "-" + day;
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, '0') + "-" + String(d.getDate()).padStart(2, '0');
 }
-
 async function buildAndShareExcel(rowIdxList, outBaseName) {
-  if (typeof ExcelJS === "undefined") {
-    toast("导出组件未加载完成", "请稍后再试，或刷新页面");
-    return;
-  }
-  if (!rowIdxList.length) {
-    toast("提示", "没有可导出的数据");
-    return;
-  }
+  if (typeof ExcelJS === "undefined") { toast("导出组件未加载完成", "请稍后再试"); return; }
+  if (!rowIdxList.length) { toast("提示", "没有可导出的数据"); return; }
   try {
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet(sheetName || "核对结果");
     ws.addRow(headers).font = { bold: true };
-
     rowIdxList.forEach(i => {
       const r = rows[i] || [];
       const row = ws.addRow(headers.map((_, j) => r[j] ?? ""));
@@ -805,7 +872,6 @@ async function buildAndShareExcel(rowIdxList, outBaseName) {
         });
       }
     });
-
     headers.forEach((h, j) => { ws.getColumn(j + 1).width = Math.max(12, String(h).length * 2 + 6); });
 
     const buf = await wb.xlsx.writeBuffer();
@@ -819,97 +885,63 @@ async function buildAndShareExcel(rowIdxList, outBaseName) {
       try { await navigator.share({ files: [file], title: outBaseName }); return; }
       catch(e){ if(e.name === "AbortError") return; }
     }
-
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = outName;
     a.click();
     setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
     toast("已下载", outName);
-  } catch (err) {
-    toast("导出失败", err.message);
-  }
+  } catch (err) { toast("导出失败", err.message); }
 }
 
-/* 导出全部 → 当天年月日.xlsx */
 $("btnExport").onclick = () => {
   if (!rows.length) return;
   buildAndShareExcel(rows.map((_, i) => i), getTodayStr());
 };
-
-/* 已扫描 → 年月日已配送的明细.xlsx */
 $("btnExportMatched").onclick = () => {
   if (!rows.length) return;
-  if (matchedSet.size === 0) {
-    toast("提示", "还没有已核对的行可导出");
-    return;
-  }
+  if (matchedSet.size === 0) { toast("提示", "还没有已核对的行可导出"); return; }
   const idxList = Array.from(matchedSet).sort((a, b) => a - b);
   buildAndShareExcel(idxList, getTodayStr() + "已配送的明细");
 };
-
-/* 运行日志 → 年月日核对日志.xlsx */
 $("btnExportLog").onclick = async () => {
-  if (typeof ExcelJS === "undefined") {
-    toast("导出组件未加载完成", "请稍后再试，或刷新页面");
-    return;
-  }
-  if (!checkLog.length) {
-    toast("提示", "还没有运行日志可导出");
-    return;
-  }
+  if (typeof ExcelJS === "undefined") { toast("导出组件未加载完成", "请稍后再试"); return; }
+  if (!checkLog.length) { toast("提示", "还没有运行日志可导出"); return; }
   try {
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet("核对日志");
     const headerRow = ws.addRow(["序号", "时间", "条码", "核对结果", "详细信息"]);
     headerRow.font = { bold: true };
-
     checkLog.forEach((item, idx) => {
       const row = ws.addRow([idx + 1, item.time, item.code, item.result, item.info || ""]);
-      if (item.result === "成功") {
-        row.getCell(4).font = { color: { argb: "FF198754" }, bold: true };
-      } else if (item.result === "失败") {
-        row.getCell(4).font = { color: { argb: "FFDC3545" }, bold: true };
-      } else if (item.result === "重复") {
-        row.getCell(4).font = { color: { argb: "FFFD7E14" }, bold: true };
-      }
+      if (item.result === "成功") row.getCell(4).font = { color: { argb: "FF198754" }, bold: true };
+      else if (item.result === "失败") row.getCell(4).font = { color: { argb: "FFDC3545" }, bold: true };
+      else if (item.result === "重复") row.getCell(4).font = { color: { argb: "FFFD7E14" }, bold: true };
     });
-
-    ws.getColumn(1).width = 8;
-    ws.getColumn(2).width = 22;
-    ws.getColumn(3).width = 25;
-    ws.getColumn(4).width = 12;
-    ws.getColumn(5).width = 60;
+    ws.getColumn(1).width = 8; ws.getColumn(2).width = 22; ws.getColumn(3).width = 25; ws.getColumn(4).width = 12; ws.getColumn(5).width = 60;
 
     const buf = await wb.xlsx.writeBuffer();
     const outName = getTodayStr() + "核对日志.xlsx";
     $("exportName").textContent = "已生成：" + outName;
-
     const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
     const file = new File([blob], outName, { type: blob.type });
-
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
       try { await navigator.share({ files: [file], title: "核对日志" }); return; }
       catch(e){ if(e.name === "AbortError") return; }
     }
-
     const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = outName;
-    a.click();
+    a.href = URL.createObjectURL(blob); a.download = outName; a.click();
     setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
     toast("已下载", outName);
-  } catch (err) {
-    toast("导出失败", err.message);
-  }
+  } catch (err) { toast("导出失败", err.message); }
 };
 
-/* ===== 清除保存的数据 ===== */
+/* ===== 清除 ===== */
 $("btnClearStorage").onclick = async () => {
-  if (!confirm("确定要清除已保存的表格和核对进度吗？此操作不可恢复。")) return;
+  if (!confirm("确定要清除已保存的表格、核对进度和运行日志吗？此操作不可恢复。")) return;
   await deleteTableData();
+  await deleteLogFromDB();
   clearMatched();
-  clearLog();
   hasSavedData = false;
   headers = []; rows = []; matchColIdx = -1;
   matchedSet = new Set(); codeIndex = new Map();
@@ -918,9 +950,11 @@ $("btnClearStorage").onclick = async () => {
   $("restoreBanner").style.display = "none";
   $("fileName").textContent = "";
   $("colBadge").style.display = "none";
-  $("scanCard").style.display = "none";
+  showDataButtons(false);
   $("statCard").style.display = "none";
   $("tableCard").style.display = "none";
+  $("logCard").style.display = "none";
+  $("readerWrap").style.display = "none";
   $("grid").innerHTML = "";
   $("log").innerHTML = "";
   toast("已清除", "保存的数据已删除");
@@ -931,10 +965,13 @@ $("btnClearStorage").onclick = async () => {
    ========================================================= */
 async function tryRestore() {
   try {
-    checkLog = loadLogFromStorage();
+    checkLog = await loadLogFromDB();
 
     const data = await loadTableData();
-    if (!data || !data.rows || !data.rows.length) { hasSavedData = false; return; }
+    if (!data || !data.rows || !data.rows.length) {
+      hasSavedData = false;
+      return;
+    }
 
     hasSavedData = true;
 
@@ -944,7 +981,25 @@ async function tryRestore() {
     sheetName = data.sheetName || "核对结果";
     fileBase = data.fileBase || "核对结果";
 
-    if (matchColIdx < 0 || matchColIdx >= headers.length) return;
+    if (matchColIdx < 0 || matchColIdx >= headers.length) {
+      pickColumn(-1, function(idx) {
+        matchColIdx = idx;
+        $("colBadge").style.display = "inline";
+        $("colBadge").textContent = "核对列：" + (headers[idx] || "");
+        matchedSet = new Set();
+        buildIndex();
+        renderTable(); updateStats();
+        showDataButtons(true);
+        $("statCard").style.display = "block";
+        $("tableCard").style.display = "block";
+        saveTableData({
+          headers: headers, rows: rows, matchColIdx: idx,
+          sheetName: sheetName, fileBase: fileBase, savedAt: Date.now()
+        });
+        toast("已读取 " + rows.length + " 行数据", "");
+      });
+      return;
+    }
 
     const matchedArr = loadMatched();
     matchedSet = new Set(matchedArr);
@@ -958,10 +1013,12 @@ async function tryRestore() {
     renderTable();
     updateStats();
 
-    $("scanCard").style.display = "block";
+    showDataButtons(true);
+    $("statCard").style.display = "block";
     $("tableCard").style.display = "block";
+    $("logCard").style.display = checkLog.length ? "block" : "none";
 
-    $("restoreText").innerHTML = "💾 已恢复上次核对进度（" + matchedSet.size + "/" + rows.length + " 已核对）";
+    $("restoreText").innerHTML = "💾 已恢复上次核对进度（" + matchedSet.size + "/" + rows.length + " 已核对，日志 " + checkLog.length + " 条）";
     $("restoreBanner").style.display = "flex";
   } catch(e) {
     console.warn("恢复数据失败", e);
