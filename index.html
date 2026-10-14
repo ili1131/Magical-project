@@ -560,13 +560,19 @@ if(matchColIdx===-1){rows.forEach((row,i)=>{row.forEach((val,j)=>{evalCell(i,j,v
 else if(matchColIdx>=0){rows.forEach((row,i)=>{evalCell(i,matchColIdx,row[matchColIdx])})}
 candidates.sort((a,b)=>b.score-a.score);return candidates.slice(0,5)}
 
-/* ============ 语音识别 —— 按住说话版（安卓优化：预热麦克风 + continuous=false + 松开延迟停止） ============ */
+/* ============ 语音识别 —— 兼容性优化版 ============ */
 let voiceRec=null,voiceRawText="",voiceNormalizedText="",voiceActive=false;
 let voiceHolding=false;
 let voiceStream=null;
 let voiceEndTimer=null;
 
 function getSpeechRecognitionClass(){return window.SpeechRecognition||window.webkitSpeechRecognition||null}
+
+function isSpeechRecognitionSupported(){
+  const SR=getSpeechRecognitionClass();
+  if(!SR)return false;
+  return true;
+}
 
 async function warmupMic(){
   if(voiceStream)return true;
@@ -582,9 +588,8 @@ async function warmupMic(){
 }
 
 function openVoicePanel(){
-  const SR=getSpeechRecognitionClass();
-  if(!SR){
-    popup("不支持语音识别","当前浏览器不支持网页语音识别。<br><br>建议使用：<br>• Android Chrome / Edge<br>• iOS Safari 14.5+<br>• 桌面 Chrome / Edge<br><br>微信内置浏览器不支持，请用系统浏览器打开。");
+  if(!isSpeechRecognitionSupported()){
+    popup("当前浏览器不支持语音识别","你正在使用的浏览器无法使用网页语音识别功能。<br><br>建议更换为：<br>• <b>Android Chrome</b>（支持最好）<br>• <b>iOS Safari 14.5+</b><br>• 桌面 Chrome / Edge<br><br>三星浏览器和 Android Edge 目前不支持此功能。");
     return;
   }
   voiceRawText="";voiceNormalizedText="";voiceActive=false;voiceHolding=false;
@@ -601,7 +606,10 @@ function openVoicePanel(){
 function startHoldVoice(){
   if(voiceHolding)return;
   const SR=getSpeechRecognitionClass();
-  if(!SR)return;
+  if(!SR){
+    $("voiceStatus").textContent="❌ 当前浏览器不支持语音识别";
+    return;
+  }
   voiceHolding=true;
   $("voiceHoldBtn").classList.add("holding");
   $("voiceStatus").textContent="🎤 正在聆听… 松开结束";
