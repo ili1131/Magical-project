@@ -143,7 +143,7 @@ td.matched{background:#ffe3e3 !important;color:#b02a37;font-weight:700}
 <button class="btn btn-primary" id="btnUpload" disabled>上传Excel</button>
 <button class="btn btn-dark need-data" id="btnExportLog" style="display:none">运行日志</button>
 <button class="btn btn-secondary need-data" id="btnChangeCol" style="display:none">切换核对模式</button>
-<button class="btn btn-warning need-data" id="btnLocate" style="display:none">📍 定位最后核对项</button>
+<button class="btn btn-warning need-data" id="btnLocate" style="display:none">📍 定位项目位置</button>
 <button class="btn btn-info need-data" id="btnExport" style="display:none">分享全部的数据</button>
 <button class="btn btn-info need-data" id="btnExportMatched" style="display:none">分享已扫描数据</button>
 <button class="btn btn-dark need-data span-2" id="btnVoice" style="display:none">🎤 语音识别条码</button>
@@ -529,9 +529,9 @@ try{const wb=new ExcelJS.Workbook();const ws=wb.addWorksheet("核对日志");con
 checkLog.forEach((item,idx)=>{const row=ws.addRow([idx+1,item.time,item.code,item.result,item.info||""]);
 if(item.result==="成功")row.getCell(4).font={color:{argb:"FF198754"},bold:true};else if(item.result==="失败")row.getCell(4).font={color:{argb:"FFDC3545"},bold:true};else if(item.result==="重复")row.getCell(4).font={color:{argb:"FFFD7E14"},bold:true}});
 ws.getColumn(1).width=8;ws.getColumn(2).width=22;ws.getColumn(3).width=25;ws.getColumn(4).width=12;ws.getColumn(5).width=60;
-const buf=await wb.xlsx.writeBuffer();const outName=getTodayStr()+"核对日志.xlsx";$("exportName").textContent="已生成："+outName;
+const buf=await wb.xlsx.writeBuffer();const d=new Date();const outName=d.getFullYear()+"年"+String(d.getMonth()+1).padStart(2,'0')+"月"+String(d.getDate()).padStart(2,'0')+"日 运行日志.xlsx";$("exportName").textContent="已生成："+outName;
 const blob=new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});const file=new File([blob],outName,{type:blob.type});
-if(navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file],title:"核对日志"});return}catch(e){if(e.name==="AbortError")return}}
+if(navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file],title:"运行日志"});return}catch(e){if(e.name==="AbortError")return}}
 const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=outName;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),5000);toast("已下载",outName)}
 catch(err){toast("导出失败",err.message)}};
 
