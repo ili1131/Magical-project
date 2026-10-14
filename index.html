@@ -51,13 +51,37 @@
   .scan-frame::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 2px; background: rgba(255,80,80,.85); animation: scanline 2s ease-in-out infinite; }
   @keyframes scanline { 0%,100% { top: 8%; } 50% { top: 92%; } }
 
-  /* 对焦提示浮层 */
-  .focus-toast {
+  .focus-ring {
     position: absolute;
-    bottom: 8px; left: 50%; transform: translateX(-50%);
-    background: rgba(0,0,0,.65); color: #fff;
-    padding: 5px 12px; border-radius: 14px; font-size: 12px;
-    pointer-events: none; z-index: 15; white-space: nowrap;
+    width: 80px; height: 80px;
+    margin-left: -40px; margin-top: -40px;
+    border: 2px solid #fff;
+    border-radius: 8px;
+    pointer-events: none;
+    z-index: 20;
+    display: none;
+    box-shadow: 0 0 0 1px rgba(0,0,0,.5), 0 0 12px rgba(255,255,255,.4);
+  }
+  .focus-ring.active {
+    display: block;
+    animation: focusPulse 0.9s ease-out;
+  }
+  @keyframes focusPulse {
+    0%   { transform: scale(1.5); opacity: 0; }
+    35%  { transform: scale(1);   opacity: 1; }
+    70%  { transform: scale(1);   opacity: 1; }
+    100% { transform: scale(1);   opacity: 0; }
+  }
+
+  #camStatus {
+    position: absolute;
+    top: 8px; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,.6); color: #fff;
+    padding: 3px 10px; border-radius: 10px;
+    font-size: 11px; white-space: nowrap;
+    z-index: 15; max-width: 92%;
+    overflow: hidden; text-overflow: ellipsis;
+    display: none;
   }
 
   #logCard { display: none; }
@@ -165,7 +189,13 @@
   </div>
 
   <div id="readerWrap">
-    <div id="reader"></div>
+    <div id="reader">
+      <div id="camStatus"></div>
+      <div class="focus-ring" id="focusRing"></div>
+    </div>
+    <div id="camTip" style="max-width:480px; margin:6px auto 0; text-align:center; font-size:12px; color:#666; display:none;">
+      💡 画面模糊时，点击画面任意位置可尝试手动对焦
+    </div>
   </div>
 
   <div class="card" id="statCard" style="display:none">
@@ -341,7 +371,7 @@ function vibrate(type) {
 }
 
 /* =========================================================
-   音频（音量拉满）
+   音频
    ========================================================= */
 let audioCtx = null;
 function ensureCtx() {
@@ -643,7 +673,129 @@ function check(code){
 }
 
 /* =========================================================
-   扫码（本次核心优化）
+   摄像头能力诊断
+   ========================================================= */
+function showCamStatus(track) {
+  const el = $("camStatus");
+  if (!el || !track) return;
+  const caps = (track.getCapabilities ? track.getCapabilities() : {}) || {};
+  const parts = [];
+
+  if (Array.isArray(caps.focusMode) && caps.focusMode.length) {
+    const f = caps.focusMode;
+    if (f.includes('continuous')) parts.push('自动对焦✓');
+    else if (f.includes('single-shot')) parts.push('单次对焦');
+    else parts.push('对焦: ' + f.join('/'));
+  } else {
+    parts.push('对焦: 不支持');
+  }
+
+  if (caps.zoom && caps.zoom.max > caps.zoom.min) {
+    parts.push('变焦 ' + caps.zoom.min.toFixed(1) + '-' + caps.zoom.max.toFixed(1));
+  }
+
+  el.textContent = parts.join(' | ');
+  el.style.display = "block";
+}
+
+/* =========================================================
+   点击对焦：五级降级尝试
+   ========================================================= */
+async function tryFocusAtPoint(track, x, y) {
+  if (!track) return false;
+  const caps = (track.getCapabilities ? track.getCapabilities() : {}) || {};
+  console.log("[对焦] 点击坐标:", x.toFixed(2), y.toFixed(2), "能力:", caps);
+
+  // 方法1: pointsOfInterest + single-shot
+  if (Array.isArray(caps.pointsOfInterest)) {
+    try {
+      await track.applyConstraints({
+        advanced: [
+          { pointsOfInterest: [{ x, y }] },
+          { focusMode: 'single-shot' }
+        ]
+      });
+      console.log("[对焦] ✓ 方法1成功：pointsOfInterest 精确对焦");
+      setTimeout(() => {
+        if (Array.isArray(caps.focusMode) && caps.focusMode.includes('continuous')) {
+          try { track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }); } catch(e){}
+        }
+      }, 2000);
+      return true;
+    } catch(e) {
+      console.warn("[对焦] 方法1失败:", e.name || e.message);
+    }
+  }
+
+  // 方法2: single-shot 全画面重对焦
+  if (Array.isArray(caps.focusMode) && caps.focusMode.includes('single-shot')) {
+    try {
+      await track.applyConstraints({ advanced: [{ focusMode: 'single-shot' }] });
+      console.log("[对焦] ✓ 方法2成功：single-shot 全画面重对焦");
+      setTimeout(() => {
+        if (Array.isArray(caps.focusMode) && caps.focusMode.includes('continuous')) {
+          try { track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }); } catch(e){}
+        }
+      }, 2000);
+      return true;
+    } catch(e) {
+      console.warn("[对焦] 方法2失败:", e.name || e.message);
+    }
+  }
+
+  // 方法3: manual → continuous 切换
+  if (Array.isArray(caps.focusMode) && caps.focusMode.includes('manual')) {
+    try {
+      await track.applyConstraints({ advanced: [{ focusMode: 'manual' }] });
+      setTimeout(() => {
+        if (Array.isArray(caps.focusMode) && caps.focusMode.includes('continuous')) {
+          try { track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }); } catch(e){}
+        } else if (Array.isArray(caps.focusMode) && caps.focusMode.includes('single-shot')) {
+          try { track.applyConstraints({ advanced: [{ focusMode: 'single-shot' }] }); } catch(e){}
+        }
+      }, 800);
+      console.log("[对焦] ✓ 方法3成功：manual 切换触发重对焦");
+      return true;
+    } catch(e) {
+      console.warn("[对焦] 方法3失败:", e.name || e.message);
+    }
+  }
+
+  // 方法4: 变焦微调触发
+  if (caps.zoom && caps.zoom.max > caps.zoom.min) {
+    try {
+      const baseZoom = track.getSettings().zoom || caps.zoom.min;
+      const bumped = Math.min(caps.zoom.max, baseZoom + 0.01);
+      await track.applyConstraints({ advanced: [{ zoom: bumped }] });
+      setTimeout(() => {
+        try { track.applyConstraints({ advanced: [{ zoom: baseZoom }] }); } catch(e){}
+      }, 100);
+      console.log("[对焦] ✓ 方法4成功：变焦微调触发重对焦");
+      return true;
+    } catch(e) {
+      console.warn("[对焦] 方法4失败:", e.name || e.message);
+    }
+  }
+
+  console.warn("[对焦] ✗ 所有方法都失败");
+  return false;
+}
+
+function showFocusRing(clientX, clientY, rect) {
+  const ring = $("focusRing");
+  if (!ring) return;
+  const px = clientX - rect.left;
+  const py = clientY - rect.top;
+  ring.style.left = px + 'px';
+  ring.style.top = py + 'px';
+  ring.classList.remove('active');
+  void ring.offsetWidth;
+  ring.classList.add('active');
+  setTimeout(() => ring.classList.remove('active'), 950);
+}
+
+/* =========================================================
+   扫码
    ========================================================= */
 let camStream = null, camTrack = null, camVideo = null;
 let nativeDetector = null, scanning = false, starting = false;
@@ -672,47 +824,30 @@ async function makeDetector(){
   return null;
 }
 
-/* 尝试用多套约束方案打开摄像头，带连续自动对焦 */
 async function openCameraWithBestConstraints() {
-  // 基础约束：后置摄像头
   const base = { facingMode: { ideal: "environment" } };
-  // 把对焦等约束直接写进 getUserMedia，浏览器更容易在启动时就启用
   const advancedFocus = [
     { focusMode: "continuous" },
     { exposureMode: "continuous" },
     { whiteBalanceMode: "continuous" }
   ];
-
-  // 逐级降级的配置列表（从最优到兜底）
   const tries = [
-    // 1. 1080p + 连续对焦（最优先，清晰度和性能平衡最好）
     { audio:false, video: Object.assign({}, base, {
-        width:  { ideal: 1920 },
-        height: { ideal: 1080 },
-        frameRate: { ideal: 30 },
-        advanced: advancedFocus
+        width:  { ideal: 1920 }, height: { ideal: 1080 },
+        frameRate: { ideal: 30 }, advanced: advancedFocus
     })},
-    // 2. 720p + 连续对焦
     { audio:false, video: Object.assign({}, base, {
-        width:  { ideal: 1280 },
-        height: { ideal: 720 },
-        frameRate: { ideal: 30 },
-        advanced: advancedFocus
+        width:  { ideal: 1280 }, height: { ideal: 720 },
+        frameRate: { ideal: 30 }, advanced: advancedFocus
     })},
-    // 3. 720p（去掉 advanced，兼容拒绝 advanced 的浏览器）
     { audio:false, video: Object.assign({}, base, {
-        width:  { ideal: 1280 },
-        height: { ideal: 720 }
+        width:  { ideal: 1280 }, height: { ideal: 720 }
     })},
-    // 4. 480p 兜底
     { audio:false, video: Object.assign({}, base, {
-        width:  { ideal: 640 },
-        height: { ideal: 480 }
+        width:  { ideal: 640 }, height: { ideal: 480 }
     })},
-    // 5. 最简
     { audio:false, video: base }
   ];
-
   let stream = null, lastErr = null;
   for (let i = 0; i < tries.length; i++) {
     try {
@@ -727,39 +862,33 @@ async function openCameraWithBestConstraints() {
   throw lastErr || new Error("无法打开摄像头");
 }
 
-/* 启动后再尝试补救对焦/变焦（有些浏览器只能在 track 起来后设置） */
 async function tuneTrackAfterStart(track) {
   if(!track) return;
   try {
     const caps = (track.getCapabilities ? track.getCapabilities() : {}) || {};
-    console.log("[摄像头] 能力：", caps);
 
-    // 1. 连续对焦
     if (Array.isArray(caps.focusMode) && caps.focusMode.includes("continuous")) {
       try { await track.applyConstraints({ advanced: [{ focusMode: "continuous" }] }); }
-      catch(e) { console.warn("连续对焦设置失败", e); }
+      catch(e) {}
     } else if (Array.isArray(caps.focusMode) && caps.focusMode.length) {
-      // 退而求其次：用单次对焦，然后每秒触发一次
       try { await track.applyConstraints({ advanced: [{ focusMode: "single-shot" }] }); } catch(e){}
-      // 定时强制重新对焦（模拟连续对焦）
-      setInterval(() => {
+      if (window._focusInterval) clearInterval(window._focusInterval);
+      window._focusInterval = setInterval(() => {
         try { track.applyConstraints({ advanced: [{ focusMode: "single-shot" }] }); } catch(e){}
       }, 1500);
     }
 
-    // 2. 连续曝光
     if (Array.isArray(caps.exposureMode) && caps.exposureMode.includes("continuous")) {
       try { await track.applyConstraints({ advanced: [{ exposureMode: "continuous" }] }); } catch(e){}
     }
 
-    // 3. 如果支持变焦，尝试 1.2x ~ 1.5x，让条码在画面里更大
     if (caps.zoom) {
       const zmin = caps.zoom.min || 1;
       const zmax = caps.zoom.max || 1;
       const z = Math.min(zmax, Math.max(zmin, 1.3));
       if (z > zmin) {
         try { await track.applyConstraints({ advanced: [{ zoom: z }] }); }
-        catch(e) { console.warn("变焦设置失败", e); }
+        catch(e) {}
       }
     }
   } catch(e) {
@@ -772,66 +901,43 @@ async function startNativeScan(){
   if(!det) throw new Error("no-native-detector");
 
   const container = $("reader");
-  container.innerHTML = "";
+  const oldVideo = container.querySelector("video");
+  if (oldVideo) container.removeChild(oldVideo);
+  const oldOverlay = container.querySelector(".scan-frame");
+  if (oldOverlay) container.removeChild(oldOverlay);
 
   const video = document.createElement("video");
   video.setAttribute("playsinline", "");
   video.setAttribute("muted", "");
   video.autoplay = true;
   video.muted = true;
-  container.appendChild(video);
+  container.insertBefore(video, container.firstChild);
 
   const overlay = document.createElement("div");
   overlay.className = "scan-frame";
   container.appendChild(overlay);
 
-  // 对焦提示
-  const hint = document.createElement("div");
-  hint.className = "focus-toast";
-  hint.textContent = "点击画面可手动对焦";
-  hint.style.display = "none";
-  container.appendChild(hint);
-
-  // 打开摄像头
   const stream = await openCameraWithBestConstraints();
   video.srcObject = stream;
   camStream = stream;
   camTrack = stream.getVideoTracks()[0];
   await video.play();
 
-  // 启动后补救对焦 / 变焦
   await tuneTrackAfterStart(camTrack);
 
-  // 点击画面对焦
-  video.addEventListener("click", async ev => {
-    if(!camTrack || !camTrack.getCapabilities) return;
-    const caps = camTrack.getCapabilities();
-    const rect = video.getBoundingClientRect();
+  showCamStatus(camTrack);
+  $("camTip").style.display = "block";
 
-    // 优先使用 pointsOfInterest（部分设备支持）
-    if (caps.pointsOfInterest) {
-      const x = (ev.clientX - rect.left) / rect.width;
-      const y = (ev.clientY - rect.top) / rect.height;
-      try{
-        await camTrack.applyConstraints({ advanced: [
-          { pointsOfInterest: [{ x, y }] },
-          { focusMode: "single-shot" }
-        ]});
-        setTimeout(()=>{ try{ camTrack.applyConstraints({ advanced:[{ focusMode:"continuous" }] }); }catch(e){} }, 2000);
-        return;
-      }catch(e){}
-    }
-    // 退而求其次：触发一次单次对焦
-    if (Array.isArray(caps.focusMode) && caps.focusMode.length) {
-      try {
-        await camTrack.applyConstraints({ advanced: [{ focusMode: "single-shot" }] });
-        setTimeout(()=>{ try{ camTrack.applyConstraints({ advanced:[{ focusMode:"continuous" }] }); }catch(e){} }, 2000);
-      } catch(e){}
+  video.addEventListener("click", async ev => {
+    const rect = video.getBoundingClientRect();
+    showFocusRing(ev.clientX, ev.clientY, rect);
+    const x = (ev.clientX - rect.left) / rect.width;
+    const y = (ev.clientY - rect.top) / rect.height;
+    const ok = await tryFocusAtPoint(camTrack, x, y);
+    if (!ok) {
+      toast("提示", "当前设备或浏览器不支持网页手动对焦");
     }
   });
-
-  // 3 秒后显示提示（让用户知道可以对焦）
-  setTimeout(()=>{ hint.style.display = "block"; }, 3000);
 
   nativeDetector = det;
   camVideo = video;
@@ -880,6 +986,7 @@ async function boostStreamResolution(){
 }
 
 function stopCamStream(){
+  if(window._focusInterval){ clearInterval(window._focusInterval); window._focusInterval = null; }
   if(camStream){ try{ camStream.getTracks().forEach(t => t.stop()); }catch(e){} }
   camStream = null; camTrack = null; camVideo = null; nativeDetector = null;
 }
@@ -893,9 +1000,9 @@ async function stopScan(){
     scanner = null; fallbackMode = false;
   }
   stopCamStream();
-  const el = $("reader");
-  el.innerHTML = "";
   $("readerWrap").style.display = "none";
+  $("camTip").style.display = "none";
+  $("camStatus").style.display = "none";
   $("btnCamera").style.display = "";
   $("btnStop").style.display = "none";
 }
