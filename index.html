@@ -84,7 +84,7 @@
     display: none;
   }
 
-  /* 新增：变焦滑块样式 */
+  /* 变焦滑块样式 */
   #zoomControl {
     position: absolute;
     bottom: 15px; left: 50%; transform: translateX(-50%);
@@ -113,7 +113,8 @@
   table { border-collapse: collapse; font-size: 13px; width: max-content; min-width: 100%; }
   th, td { border: 1px solid #e3e7ee; padding: 7px 8px; text-align: left; white-space: nowrap; }
   th { background: #eef2f8; position: sticky; top: 0; z-index: 1; }
-  tr.matched td { background: #ffe3e3 !important; color: #b02a37; font-weight: 700; }
+  /* 修改：只标红命中的单元格，不再整行标红 */
+  td.matched { background: #ffe3e3 !important; color: #b02a37; font-weight: 700; }
   .table-wrap { max-height: 50vh; overflow: auto; border-radius: 8px; -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y; }
   .hint { color: #666; font-size: 13px; line-height: 1.6; }
   #fileName { font-size: 13px; color: #0b5ed7; margin-left: 6px; word-break: break-all; }
@@ -165,6 +166,9 @@
   .colPickBtn:active { background: #e0ecff; border-color: #0b5ed7; }
   .colPickBtn.current { border-color: #0b5ed7; background: #e0ecff; }
   .colPickBtn .idx { color: #0b5ed7; margin-right: 8px; font-size: 12px; font-weight: 700; }
+  .colPickBtn.allBtn { background: #fff5e6; border-color: #ffd699; }
+  .colPickBtn.allBtn.current { border-color: #fd7e14; background: #ffe9cc; }
+  .colPickBtn.allBtn .idx { color: #fd7e14; }
 </style>
 </head>
 <body>
@@ -193,7 +197,7 @@
       <button class="btn btn-primary" id="btnUpload" disabled>Excel</button>
       <button class="btn btn-dark need-data" id="btnExportLog" style="display:none">运行日志</button>
 
-      <button class="btn btn-secondary need-data" id="btnChangeCol" style="display:none">更换核对列</button>
+      <button class="btn btn-secondary need-data" id="btnChangeCol" style="display:none">切换核对模式</button>
       <button class="btn btn-warning need-data" id="btnLocate" style="display:none">📍 定位最后核对项</button>
 
       <button class="btn btn-info need-data" id="btnExport" style="display:none">导出全部</button>
@@ -212,7 +216,6 @@
     <div id="reader">
       <div id="camStatus"></div>
       <div class="focus-ring" id="focusRing"></div>
-      <!-- 新增：变焦滑块 UI -->
       <div id="zoomControl">
         <span>变焦</span>
         <input type="range" id="zoomSlider" min="1" max="8" step="0.1" value="1">
@@ -253,8 +256,8 @@
 
 <div id="colPickerMask">
   <div id="colPicker">
-    <h3>请选择要核对的列</h3>
-    <div class="colPickerHint">点击下方任意列名，该列将作为扫码核对的目标</div>
+    <h3>请选择核对模式</h3>
+    <div class="colPickerHint">「全部列」会对整张表格所有单元格进行核对；选择具体列则仅核对那一列</div>
     <div id="colPickerList"></div>
   </div>
 </div>
@@ -305,7 +308,11 @@ loadOne(LIBS.XLSX, 0, function(){
 
 <script>
 let sheetName = "", headers = [], rows = [];
-let matchColIdx = -1, matchedSet = new Set(), codeIndex = new Map();
+// matchColIdx: null=未选择, -1=全部列模式, >=0=指定列
+let matchColIdx = null;
+let matchedSet = new Set();       // 已核对的行索引（用于统计）
+let matchedCells = new Set();     // 已核对的单元格 "行-列"
+let codeIndex = new Map();        // code -> [{r, c}, ...]
 let fileBase = "核对结果";
 let lastHitRow = -1;
 let hasSavedData = false;
@@ -324,7 +331,8 @@ function showDataButtons(show) {
 const DB_NAME = 'philips_check_db';
 const DB_VERSION = 1;
 const DB_STORE = 'table_data';
-const KEY_MATCHED = 'philips_check_matched_v1';
+const KEY_MATCHED_CELLS = 'philips_check_matched_cells_v1';
+const KEY_MATCHED_OLD   = 'philips_check_matched_v1';
 
 let _dbPromise = null;
 function openDB() {
@@ -373,14 +381,33 @@ function saveLogToDB() { return dbPut('log', checkLog.slice(-5000)); }
 function loadLogFromDB() { return dbGet('log').then(v => Array.isArray(v) ? v : []); }
 function deleteLogFromDB() { return dbDelete('log'); }
 
+/* ===== 单元格级进度保存 ===== */
 function saveMatched() {
-  try { localStorage.setItem(KEY_MATCHED, JSON.stringify(Array.from(matchedSet))); } catch(e) {}
+  try {
+    localStorage.setItem(KEY_MATCHED_CELLS, JSON.stringify(Array.from(matchedCells)));
+  } catch(e) {}
 }
-function loadMatched() {
-  try { const s = localStorage.getItem(KEY_MATCHED); return s ? JSON.parse(s) : []; } catch(e) { return []; }
+function loadMatchedCells() {
+  try {
+    const s = localStorage.getItem(KEY_MATCHED_CELLS);
+    return s ? JSON.parse(s) : [];
+  } catch(e) { return []; }
 }
 function clearMatched() {
-  try { localStorage.removeItem(KEY_MATCHED); } catch(e) {}
+  try {
+    localStorage.removeItem(KEY_MATCHED_CELLS);
+    localStorage.removeItem(KEY_MATCHED_OLD);
+  } catch(e) {}
+}
+
+/* 从 matchedCells 重新推导 matchedSet */
+function rebuildMatchedSetFromCells() {
+  matchedSet = new Set();
+  matchedCells.forEach(k => {
+    const r = parseInt(String(k).split("-")[0], 10);
+    if (!isNaN(r)) matchedSet.add(r);
+  });
+  lastHitRow = matchedSet.size ? Math.max.apply(null, Array.from(matchedSet)) : -1;
 }
 
 /* =========================================================
@@ -488,11 +515,29 @@ function esc(s){
   return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 }
 
-/* ===== 列选择 ===== */
+/* ===== 核对模式显示文本 ===== */
+function modeText(idx) {
+  if (idx === -1) return "全部列（核对整表所有单元格）";
+  if (idx === null || idx === undefined) return "";
+  return headers[idx] || ("第" + (idx + 1) + "列");
+}
+
+/* ===== 列选择（含"全部列"） ===== */
 function pickColumn(currentIdx, callback) {
   const mask = $("colPickerMask");
   const list = $("colPickerList");
   list.innerHTML = "";
+
+  // 全部列选项
+  const allBtn = document.createElement("button");
+  allBtn.className = "colPickBtn allBtn" + (currentIdx === -1 ? " current" : "");
+  allBtn.innerHTML = '<span class="idx">ALL</span>全部列（核对整表所有单元格）';
+  allBtn.onclick = () => {
+    mask.classList.remove("show");
+    callback(-1);
+  };
+  list.appendChild(allBtn);
+
   headers.forEach((h, i) => {
     const btn = document.createElement("button");
     btn.className = "colPickBtn" + (i === currentIdx ? " current" : "");
@@ -543,12 +588,13 @@ function pickFile() {
       $("uploadBusy").style.display = "none";
       $("btnUpload").disabled = false;
 
-      pickColumn(-1, function(idx) {
+      pickColumn(null, function(idx) {
         matchColIdx = idx;
         $("colBadge").style.display = "inline";
-        $("colBadge").textContent = "核对列：" + (headers[idx] || "第" + (idx + 1) + "列");
+        $("colBadge").textContent = "核对模式：" + modeText(idx);
 
         matchedSet = new Set();
+        matchedCells = new Set();
         lastHitRow = -1;
         clearMatched();
         buildIndex();
@@ -568,8 +614,8 @@ function pickFile() {
           sheetName: sheetName, fileBase: fileBase, savedAt: Date.now()
         }).then(ok => {
           hasSavedData = ok;
-          if (ok) toast("核对列：" + (headers[idx] || ""), "✅ 进度已保存，可放心关闭");
-          else    toast("核对列：" + (headers[idx] || ""), "⚠️ 进度保存失败，请勿关闭页面");
+          if (ok) toast("核对模式：" + modeText(idx), "✅ 进度已保存，可放心关闭");
+          else    toast("核对模式：" + modeText(idx), "⚠️ 进度保存失败，请勿关闭页面");
         });
       });
 
@@ -583,17 +629,15 @@ function pickFile() {
   inp.click();
 }
 
+/* ===== 切换核对模式（不重置已核对数据） ===== */
 $("btnChangeCol").onclick = () => {
   if (!headers.length) return;
-  if (!confirm("更换核对列会清空当前核对进度，是否继续？")) return;
   pickColumn(matchColIdx, function(idx) {
     matchColIdx = idx;
     $("colBadge").style.display = "inline";
-    $("colBadge").textContent = "核对列：" + (headers[idx] || "第" + (idx + 1) + "列");
+    $("colBadge").textContent = "核对模式：" + modeText(idx);
 
-    matchedSet = new Set();
-    lastHitRow = -1;
-    clearMatched();
+    // 只重建索引，不重置 matchedCells / matchedSet / 日志
     buildIndex();
     renderTable(); updateStats();
 
@@ -601,33 +645,57 @@ $("btnChangeCol").onclick = () => {
       headers: headers, rows: rows, matchColIdx: matchColIdx,
       sheetName: sheetName, fileBase: fileBase, savedAt: Date.now()
     });
-    toast("已切换核对列", headers[idx] || "");
+    toast("已切换核对模式", modeText(idx));
   });
 };
 
+/* ===== 建立索引：支持"全部列"与"指定列"两种模式 ===== */
 function buildIndex(){
   codeIndex = new Map();
-  rows.forEach((r, i) => {
-    const k = String(r[matchColIdx] ?? "").trim();
-    if(!k) return;
-    if(!codeIndex.has(k)) codeIndex.set(k, []);
-    codeIndex.get(k).push(i);
-  });
+  if (matchColIdx === null || matchColIdx === undefined) return;
+
+  if (matchColIdx === -1) {
+    // 全部列模式：索引所有单元格
+    rows.forEach((r, i) => {
+      r.forEach((val, j) => {
+        const k = String(val ?? "").trim();
+        if (!k) return;
+        if (!codeIndex.has(k)) codeIndex.set(k, []);
+        codeIndex.get(k).push({ r: i, c: j });
+      });
+    });
+  } else {
+    // 指定列模式
+    rows.forEach((r, i) => {
+      const k = String(r[matchColIdx] ?? "").trim();
+      if (!k) return;
+      if (!codeIndex.has(k)) codeIndex.set(k, []);
+      codeIndex.get(k).push({ r: i, c: matchColIdx });
+    });
+  }
 }
+
+/* ===== 渲染表格：只标红命中的单元格 ===== */
 function renderTable(){
   let html = "<tr>" + headers.map(h=>"<th>"+esc(h)+"</th>").join("") + "</tr>";
   rows.forEach((r,i)=>{
-    html += "<tr data-i='"+i+"' class='"+(matchedSet.has(i)?"matched":"")+"'>"
-          + headers.map((_,j)=>"<td>"+esc(String(r[j]??""))+"</td>").join("") + "</tr>";
+    html += "<tr data-i='"+i+"'>";
+    headers.forEach((_,j)=>{
+      const isMatched = matchedCells.has(i + "-" + j);
+      html += "<td" + (isMatched ? " class='matched'" : "") + ">" + esc(String(r[j]??"")) + "</td>";
+    });
+    html += "</tr>";
   });
   $("grid").innerHTML = html;
 }
+
 function updateStats(){
   $("statCard").style.display = "block";
   $("stTotal").textContent = rows.length;
   $("stDone").textContent = matchedSet.size;
   $("stLeft").textContent = rows.length - matchedSet.size;
 }
+
 function getRowInfo(rowIndex) {
   const rowData = rows[rowIndex] || [];
   const parts = [];
@@ -666,24 +734,35 @@ function addLog(code, result, info) {
 
 function check(code){
   code = String(code||"").trim(); if(!code) return;
-  const list = codeIndex.get(code);
-  let hit = -1, dup = false;
-  if(list){
-    for(const i of list){ if(!matchedSet.has(i)){ hit = i; break; } }
-    if(hit < 0) dup = true;
+  if (matchColIdx === null || matchColIdx === undefined) {
+    toast("提示", "请先选择核对模式");
+    return;
   }
+
+  const positions = codeIndex.get(code);
+  let hit = null, dup = false;
+  if (positions) {
+    for (const p of positions) {
+      if (!matchedCells.has(p.r + "-" + p.c)) { hit = p; break; }
+    }
+    if (!hit) dup = true;
+  }
+
   const ts = new Date().toLocaleTimeString();
-  if(hit >= 0){
-    matchedSet.add(hit);
-    lastHitRow = hit;
+  if (hit) {
+    matchedCells.add(hit.r + "-" + hit.c);
+    matchedSet.add(hit.r);
+    lastHitRow = hit.r;
+
     logMsg("ok", ts + " ✅ 匹配成功：" + code);
     renderTable(); updateStats();
     saveMatched();
-    const info = getRowInfo(hit);
+
+    const info = getRowInfo(hit.r) + " ｜ 命中列：" + (headers[hit.c] || ("列" + (hit.c + 1)));
     addLog(code, "成功", info);
     playBeep('ok'); vibrate('ok'); speak("可以配送");
     toast("✅ 已核对 · 可以配送", info);
-  } else if(dup){
+  } else if (dup) {
     logMsg("dup", ts + " ⚠️ 重复扫描：" + code);
     addLog(code, "重复", "该条码已核对过");
     playBeep('dup'); vibrate('dup'); speak("重复扫描");
@@ -694,7 +773,7 @@ function check(code){
     playBeep('miss'); vibrate('miss'); speak("不可配送，需滞留");
     toast("❌ 不可配送，需滞留", "未在表格中找到：" + code);
   }
-  if(matchedSet.size === rows.length && rows.length) speak("核对完成");
+  if (matchedSet.size === rows.length && rows.length) speak("核对完成");
 }
 
 /* =========================================================
@@ -724,14 +803,13 @@ function showCamStatus(track) {
 }
 
 /* =========================================================
-   点击对焦：五级降级尝试
+   点击对焦：四级降级尝试
    ========================================================= */
 async function tryFocusAtPoint(track, x, y) {
   if (!track) return false;
   const caps = (track.getCapabilities ? track.getCapabilities() : {}) || {};
   console.log("[对焦] 点击坐标:", x.toFixed(2), y.toFixed(2), "能力:", caps);
 
-  // 提取基础约束，解决部分设备对 advanced 数组忽略的问题
   const settings = track.getSettings();
   const baseConstraints = {
     width: settings.width || { ideal: 1920 },
@@ -754,9 +832,7 @@ async function tryFocusAtPoint(track, x, y) {
         }
       }, 2000);
       return true;
-    } catch(e) {
-      console.warn("[对焦] 方法1失败:", e.name || e.message);
-    }
+    } catch(e) { console.warn("[对焦] 方法1失败:", e.name || e.message); }
   }
 
   // 方法2: single-shot 全画面重对焦
@@ -770,9 +846,7 @@ async function tryFocusAtPoint(track, x, y) {
         }
       }, 2000);
       return true;
-    } catch(e) {
-      console.warn("[对焦] 方法2失败:", e.name || e.message);
-    }
+    } catch(e) { console.warn("[对焦] 方法2失败:", e.name || e.message); }
   }
 
   // 方法3: manual → continuous 切换
@@ -788,9 +862,7 @@ async function tryFocusAtPoint(track, x, y) {
       }, 800);
       console.log("[对焦] ✓ 方法3成功：manual 切换触发重对焦");
       return true;
-    } catch(e) {
-      console.warn("[对焦] 方法3失败:", e.name || e.message);
-    }
+    } catch(e) { console.warn("[对焦] 方法3失败:", e.name || e.message); }
   }
 
   console.warn("[对焦] ✗ 所有方法都失败");
@@ -842,6 +914,8 @@ async function makeDetector(){
 
 async function openCameraWithBestConstraints() {
   const base = { facingMode: { ideal: "environment" } };
+  const ptzRequest = { zoom: true };
+
   const advancedFocus = [
     { focusMode: "continuous" },
     { exposureMode: "continuous" },
@@ -850,11 +924,13 @@ async function openCameraWithBestConstraints() {
   const tries = [
     { audio:false, video: Object.assign({}, base, {
         width:  { ideal: 1920 }, height: { ideal: 1080 },
-        frameRate: { ideal: 30 }, advanced: advancedFocus
+        frameRate: { ideal: 30 },
+        advanced: advancedFocus.concat([ptzRequest])
     })},
     { audio:false, video: Object.assign({}, base, {
         width:  { ideal: 1280 }, height: { ideal: 720 },
-        frameRate: { ideal: 30 }, advanced: advancedFocus
+        frameRate: { ideal: 30 },
+        advanced: advancedFocus.concat([ptzRequest])
     })},
     { audio:false, video: Object.assign({}, base, {
         width:  { ideal: 1280 }, height: { ideal: 720 }
@@ -934,36 +1010,39 @@ async function startNativeScan(){
   showCamStatus(camTrack);
   $("camTip").style.display = "block";
 
-  // ====== 方案三新增：初始化变焦滑块 ======
+  // ====== 变焦滑块初始化 ======
   const zoomSlider = $("zoomSlider");
   const zoomControl = $("zoomControl");
   const caps = camTrack.getCapabilities ? camTrack.getCapabilities() : {};
-  if (caps.zoom && caps.zoom.max > caps.zoom.min) {
-    zoomSlider.min = caps.zoom.min;
-    zoomSlider.max = caps.zoom.max;
-    zoomSlider.step = (caps.zoom.max - caps.zoom.min) / 20; // 分成20档
-    zoomSlider.value = camTrack.getSettings().zoom || caps.zoom.min;
-    zoomControl.style.display = "flex";
 
-    // 移除旧的事件监听器防止重复绑定
-    zoomSlider.oninput = async (e) => {
-      const val = parseFloat(e.target.value);
-      try {
-        // 关键修复：将 zoom 直接作为基础约束传入，解决 Android Edge 无效的问题
-        const settings = camTrack.getSettings();
-        await camTrack.applyConstraints({
-          width: settings.width || { ideal: 1920 },
-          height: settings.height || { ideal: 1080 },
-          zoom: val
-        });
-      } catch (err) {
-        console.warn("滑块变焦失败", err);
-      }
-    };
+  const browserSupportsZoom = navigator.mediaDevices.getSupportedConstraints().zoom;
+  const deviceSupportsZoom = caps.zoom && caps.zoom.max > caps.zoom.min;
+
+  if (browserSupportsZoom && deviceSupportsZoom) {
+      zoomSlider.min = caps.zoom.min;
+      zoomSlider.max = caps.zoom.max;
+      zoomSlider.step = (caps.zoom.max - caps.zoom.min) / 20;
+      zoomSlider.value = camTrack.getSettings().zoom || caps.zoom.min;
+      zoomControl.style.display = "flex";
+
+      zoomSlider.oninput = async (e) => {
+          const val = parseFloat(e.target.value);
+          try {
+              await camTrack.applyConstraints({ zoom: val });
+          } catch (err) {
+              console.error("变焦应用失败:", err.name, err.message);
+              if (err.name === 'OverconstrainedError') {
+                  toast("提示", "当前摄像头不支持此变焦级别");
+              } else if (err.name === 'NotAllowedError') {
+                  toast("提示", "请重新授权摄像头 PTZ 权限");
+              }
+          }
+      };
   } else {
-    zoomControl.style.display = "none";
+      zoomControl.style.display = "none";
+      console.warn("设备或浏览器不支持变焦功能", { browserSupportsZoom, deviceSupportsZoom, caps });
   }
-  // ====== 方案三新增结束 ======
+  // ====== 变焦滑块结束 ======
 
   video.addEventListener("click", async ev => {
     const rect = video.getBoundingClientRect();
@@ -1040,7 +1119,7 @@ async function stopScan(){
   $("readerWrap").style.display = "none";
   $("camTip").style.display = "none";
   $("camStatus").style.display = "none";
-  $("zoomControl").style.display = "none"; // 隐藏变焦控件
+  $("zoomControl").style.display = "none";
   $("btnCamera").style.display = "";
   $("btnStop").style.display = "none";
 }
@@ -1109,12 +1188,14 @@ async function buildAndShareExcel(rowIdxList, outBaseName) {
     rowIdxList.forEach(i => {
       const r = rows[i] || [];
       const row = ws.addRow(headers.map((_, j) => r[j] ?? ""));
-      if (matchedSet.has(i)) {
-        row.eachCell(cell => {
+      // 只给命中的单元格上色
+      headers.forEach((_, j) => {
+        if (matchedCells.has(i + "-" + j)) {
+          const cell = row.getCell(j + 1);
           cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFC7CE" } };
           cell.font = { color: { argb: "FF9C0006" }, bold: true };
-        });
-      }
+        }
+      });
     });
     headers.forEach((h, j) => { ws.getColumn(j + 1).width = Math.max(12, String(h).length * 2 + 6); });
 
@@ -1187,8 +1268,11 @@ $("btnClearStorage").onclick = function() {
   if (!confirm("确定要清除已保存的表格、核对进度和运行日志吗？此操作不可恢复。")) return;
 
   hasSavedData = false;
-  headers = []; rows = []; matchColIdx = -1;
-  matchedSet = new Set(); codeIndex = new Map();
+  headers = []; rows = [];
+  matchColIdx = null;
+  matchedSet = new Set();
+  matchedCells = new Set();
+  codeIndex = new Map();
   checkLog = [];
   lastHitRow = -1; fileBase = "核对结果";
 
@@ -1232,16 +1316,22 @@ async function tryRestore() {
 
     headers = data.headers || [];
     rows = data.rows || [];
-    matchColIdx = data.matchColIdx;
+    matchColIdx = (data.matchColIdx === undefined) ? null : data.matchColIdx;
     sheetName = data.sheetName || "核对结果";
     fileBase = data.fileBase || "核对结果";
 
-    if (matchColIdx < 0 || matchColIdx >= headers.length) {
-      pickColumn(-1, function(idx) {
+    const needPick = (matchColIdx === null ||
+                      (matchColIdx >= 0 && matchColIdx >= headers.length));
+
+    if (needPick) {
+      pickColumn(null, function(idx) {
         matchColIdx = idx;
         $("colBadge").style.display = "inline";
-        $("colBadge").textContent = "核对列：" + (headers[idx] || "");
-        matchedSet = new Set();
+        $("colBadge").textContent = "核对模式：" + modeText(idx);
+
+        matchedCells = new Set(loadMatchedCells());
+        rebuildMatchedSetFromCells();
+
         buildIndex();
         renderTable(); updateStats();
         showDataButtons(true);
@@ -1256,13 +1346,13 @@ async function tryRestore() {
       return;
     }
 
-    const matchedArr = loadMatched();
-    matchedSet = new Set(matchedArr);
-    lastHitRow = matchedArr.length ? Math.max.apply(null, matchedArr) : -1;
+    // 恢复单元格级进度
+    matchedCells = new Set(loadMatchedCells());
+    rebuildMatchedSetFromCells();
 
     $("fileName").textContent = "（已恢复）" + fileBase + ".xlsx";
     $("colBadge").style.display = "inline";
-    $("colBadge").textContent = "核对列：" + headers[matchColIdx];
+    $("colBadge").textContent = "核对模式：" + modeText(matchColIdx);
 
     buildIndex();
     renderTable();
@@ -1273,7 +1363,7 @@ async function tryRestore() {
     $("tableCard").style.display = "block";
     $("logCard").style.display = checkLog.length ? "block" : "none";
 
-    $("restoreText").innerHTML = "💾 已恢复上次核对进度（" + matchedSet.size + "/" + rows.length + " 已核对，日志 " + checkLog.length + " 条）";
+    $("restoreText").innerHTML = "💾 已恢复上次核对进度（" + matchedSet.size + "/" + rows.length + " 行已核对，日志 " + checkLog.length + " 条）";
     $("restoreBanner").style.display = "flex";
   } catch(e) {
     console.warn("恢复数据失败", e);
