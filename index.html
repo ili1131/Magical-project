@@ -1187,29 +1187,40 @@ function stopCamStream(){
   camStream = null; camTrack = null; camVideo = null; nativeDetector = null;
 }
 
-/* ===== 核心修复：无论发生什么，确保 UI 按钮恢复 ===== */
+/* ===== 核心修复：优先恢复UI，再异步停止摄像头 ===== */
 async function stopScan(){
+  // 1. 【同步执行】立即恢复所有UI按钮，确保用户一定能看到变化
+  $("readerWrap").style.display = "none";
+  $("camTip").style.display = "none";
+  $("camStatus").style.display = "none";
+  $("controlPanel").style.display = "none";
+  $("btnCamera").style.display = "";
+  $("btnStop").style.display = "none";
+  $("btnCamera").disabled = false;
+
+  // 2. 停止扫描逻辑
   scanning = false;
   if(scanTimer){ clearTimeout(scanTimer); scanTimer = null; }
 
-  try {
-    if(fallbackMode && scanner){
-      try { await scanner.stop(); } catch(e) { console.warn("停止扫码器失败", e); }
-      try { scanner.clear(); } catch(e) {}
-      scanner = null; fallbackMode = false;
+  // 3. 释放本地摄像头流（同步，不会卡住）
+  stopCamStream();
+
+  // 4. 处理 Html5Qrcode 的停止（不 await，避免 iOS 上卡死）
+  if(fallbackMode && scanner){
+    const oldScanner = scanner;
+    scanner = null;
+    fallbackMode = false;
+    try {
+      // 不等待 Promise resolve，直接调用，让它在后台默默结束
+      oldScanner.stop().then(() => {
+         try { oldScanner.clear(); } catch(e){}
+      }).catch(e => {
+         console.warn("停止Html5Qrcode失败:", e);
+         try { oldScanner.clear(); } catch(e){}
+      });
+    } catch(e) {
+      try { oldScanner.clear(); } catch(e){}
     }
-    stopCamStream();
-  } catch (err) {
-    console.error("停止扫描时发生错误:", err);
-  } finally {
-    // 必须放在 finally 中，防止因某个异常导致 UI 卡死
-    $("readerWrap").style.display = "none";
-    $("camTip").style.display = "none";
-    $("camStatus").style.display = "none";
-    $("controlPanel").style.display = "none";
-    $("btnCamera").style.display = "";
-    $("btnStop").style.display = "none";
-    $("btnCamera").disabled = false; // 确保按钮可再次点击
   }
 }
 
