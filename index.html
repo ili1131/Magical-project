@@ -76,16 +76,42 @@ main{max-width:960px;margin:0 auto;padding:14px 12px 28px}
 .btn:active::after{width:240%;height:240%;opacity:.85;transition:width .45s ease,height .45s ease,opacity .1s ease}
 .btn:disabled{opacity:.42;cursor:not-allowed;transform:none;box-shadow:var(--glass-shadow-sm)}
 .btn-sm{padding:7px 14px;font-size:13px;border-radius:12px}
-.btn-primary,.btn-success,.btn-danger,.btn-secondary,.btn-warning,.btn-info,.btn-dark{
-  color:var(--ink);
-  background:linear-gradient(180deg,rgba(255,255,255,.82),rgba(255,255,255,.58));
-  border-color:var(--glass-border);
+
+/* ★ 波浪玻璃按钮：近乎透明 + 上下波浪纹理铺满整个按钮 */
+.btn-wave{
+  position:relative;overflow:hidden;
+  color:#2c3e50;
+  background:
+    /* 顶部波浪 */
+    url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20100%2014'%20preserveAspectRatio='none'%3E%3Cpath%20d='M0%207%20Q%2012.5%200%2025%207%20T%2050%207%20T%2075%207%20T%20100%207%20V%200%20H%200%20Z'%20fill='%23b8d4ff'%20fill-opacity='0.35'/%3E%3C/svg%3E") 0 0/100% 52% no-repeat,
+    /* 底部波浪 */
+    url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20100%2014'%20preserveAspectRatio='none'%3E%3Cpath%20d='M0%207%20Q%2012.5%2014%2025%207%20T%2050%207%20T%2075%207%20T%20100%207%20V%2014%20H%200%20Z'%20fill='%23cfe4ff'%20fill-opacity='0.38'/%3E%3C/svg%3E") 0 100%/100% 52% no-repeat,
+    /* 叠加一层细密波浪（贯穿整个按钮） */
+    url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2040%208'%20preserveAspectRatio='none'%3E%3Cpath%20d='M0%204%20Q%205%200%2010%204%20T%2020%204%20T%2030%204%20T%2040%204'%20stroke='%23ffffff'%20stroke-opacity='0.65'%20fill='none'%20stroke-width='0.8'/%3E%3C/svg%3E") 0 22%/100% 30% repeat-x,
+    url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2040%208'%20preserveAspectRatio='none'%3E%3Cpath%20d='M0%204%20Q%205%208%2010%204%20T%2020%204%20T%2030%204%20T%2040%204'%20stroke='%23b8d4ff'%20stroke-opacity='0.45'%20fill='none'%20stroke-width='0.8'/%3E%3C/svg%3E") 0 62%/100% 30% repeat-x,
+    /* 玻璃底色（近乎透明） */
+    linear-gradient(180deg, rgba(255,255,255,.42), rgba(226,240,255,.22));
+  background-color:rgba(255,255,255,.18);
+  border:1px solid rgba(255,255,255,.68);
+  box-shadow:
+    0 4px 20px rgba(31,38,135,.10),
+    inset 0 1px 0 rgba(255,255,255,.9),
+    inset 0 -1px 0 rgba(180,210,255,.35);
+  -webkit-backdrop-filter:blur(20px) saturate(180%);
+  backdrop-filter:blur(20px) saturate(180%);
+  transition:transform .18s cubic-bezier(.2,.8,.3,1), box-shadow .22s ease, background .22s ease, opacity .2s ease;
 }
-/* 淡蓝色玻璃珠状态（无颜色倾向） */
+.btn-wave:active{
+  transform:scale(.965);
+  box-shadow:
+    0 2px 10px rgba(31,38,135,.14),
+    inset 0 1px 0 rgba(255,255,255,.85);
+}
+.btn-wave:disabled{opacity:.42;cursor:not-allowed;transform:none}
+
 .btn-primary,.btn-success{
-  background:linear-gradient(180deg,rgba(255,255,255,.88),rgba(226,240,255,.55));
-  border-color:rgba(255,255,255,.88);
-  color:#3a4a5c;
+  background:linear-gradient(180deg,rgba(255,255,255,.9),rgba(214,232,255,.66));
+  border-color:rgba(255,255,255,.9);color:#0a4fa8;
 }
 .btn-danger{color:#a3231b;background:linear-gradient(180deg,rgba(255,255,255,.88),rgba(255,224,222,.6));border-color:rgba(255,255,255,.88)}
 .btn-warning{color:#8a5400;background:linear-gradient(180deg,rgba(255,255,255,.88),rgba(255,236,204,.6));border-color:rgba(255,255,255,.88)}
@@ -227,14 +253,14 @@ td.matched{background:#ffe3e3 !important;color:#b02a37;font-weight:700}
 
 <div class="card">
 <div class="btn-grid">
-<button class="btn btn-primary" id="btnUpload" disabled>上传Excel</button>
-<button class="btn btn-primary need-data" id="btnExportLog" style="display:none">运行日志</button>
-<button class="btn btn-primary need-data" id="btnChangeCol" style="display:none">切换核对模式</button>
-<button class="btn btn-primary need-data" id="btnLocate" style="display:none">定位项目位置</button>
-<button class="btn btn-primary need-data" id="btnExport" style="display:none">分享全部的数据</button>
-<button class="btn btn-primary need-data" id="btnExportMatched" style="display:none">分享已扫描数据</button>
-<button class="btn btn-success need-data span-2" id="btnVoice" style="display:none">语音识别</button>
-<button class="btn btn-success need-data span-2" id="btnCamera" style="display:none">开始扫描</button>
+<button class="btn btn-wave" id="btnUpload" disabled>上传文件</button>
+<button class="btn btn-wave need-data" id="btnExportLog" style="display:none">运行日志</button>
+<button class="btn btn-wave need-data" id="btnChangeCol" style="display:none">切换核对模式</button>
+<button class="btn btn-wave need-data" id="btnLocate" style="display:none">定位项目位置</button>
+<button class="btn btn-wave need-data" id="btnExport" style="display:none">分享全部的数据</button>
+<button class="btn btn-wave need-data" id="btnExportMatched" style="display:none">分享已扫描数据</button>
+<button class="btn btn-wave need-data span-2" id="btnVoice" style="display:none">语音识别</button>
+<button class="btn btn-wave need-data span-2" id="btnCamera" style="display:none">开始扫描</button>
 <button class="btn btn-danger span-2" id="btnStop" style="display:none">停止扫描</button>
 </div>
 <div style="margin-top:10px;min-height:18px">
