@@ -39,42 +39,40 @@
   .hint { color: #666; font-size: 13px; line-height: 1.6; }
   #fileName { font-size: 13px; color: #0b5ed7; margin-left: 6px; word-break: break-all; }
 
-  /* 成功/失败弹窗：多行显示 */
-  .toast { 
-    position: fixed; 
-    left: 50%; 
-    bottom: 60px; 
-    transform: translateX(-50%); 
-    background: rgba(0,0,0,.88); 
-    color: #fff; 
-    padding: 14px 22px; 
-    border-radius: 18px; 
-    font-size: 15px; 
-    display: none; 
-    z-index: 99; 
-    max-width: 90vw; 
-    text-align: center; 
-    line-height: 1.6; 
-    word-break: break-word; 
+  .toast {
+    position: fixed;
+    left: 50%;
+    bottom: 60px;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,.88);
+    color: #fff;
+    padding: 14px 22px;
+    border-radius: 18px;
+    font-size: 15px;
+    display: none;
+    z-index: 99;
+    max-width: 90vw;
+    text-align: center;
+    line-height: 1.6;
+    word-break: break-word;
     box-shadow: 0 6px 20px rgba(0,0,0,.4);
   }
-  .toast .head {
-    font-size: 16px;
-    font-weight: 700;
-    margin-bottom: 6px;
-  }
-  .toast .info {
-    display: block;
-    font-size: 13px;
-    font-weight: 400;
-    color: #ffd75e;
-    margin-top: 2px;
-  }
+  .toast .head { font-size: 16px; font-weight: 700; }
+  .toast .info { display: block; font-size: 13px; font-weight: 400; color: #ffd75e; margin-top: 6px; }
 
   #loadStatus { position: fixed; inset: 0; background: rgba(255,255,255,.92); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; z-index: 100; font-size: 15px; color: #333; }
   .spinner { width: 36px; height: 36px; border: 4px solid #dbe4f0; border-top-color: #0b5ed7; border-radius: 50%; animation: spin 1s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
   #loadRetry { display: none; }
+
+  /* 上传文件时的局部加载提示 */
+  #uploadBusy {
+    display: none;
+    margin-left: 8px;
+    font-size: 13px;
+    color: #0b5ed7;
+  }
+
   #envWarn { display: none; background: #fff3cd; color: #7a5b00; border: 1px solid #ffe69c; border-radius: 10px; padding: 10px 12px; font-size: 13px; line-height: 1.6; margin-bottom: 14px; }
   #envWarn b { color: #b02a37; }
   #modalMask { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: none; align-items: center; justify-content: center; z-index: 200; padding: 18px; }
@@ -102,7 +100,9 @@
   <div id="envWarn"></div>
 
   <div class="card">
-    <button class="btn btn-primary" id="btnUpload" disabled>① 上传 Excel 表格</button><span id="fileName"></span>
+    <button class="btn btn-primary" id="btnUpload" disabled>① 上传 Excel 表格</button>
+    <span id="fileName"></span>
+    <span id="uploadBusy">⏳ 正在解析表格…</span>
     <div class="hint" style="margin-top:8px">
       支持 .xlsx / .xls / .csv。系统会自动查找标题为 <b>RML/RMD</b> 的列作为核对列。
     </div>
@@ -143,11 +143,6 @@
     <div class="mfoot"><button class="btn btn-primary" id="modalOk">知道了</button></div>
   </div>
 </div>
-
-<!-- 三个音频标签：成功、重复、失败 -->
-<audio id="audioOk"   preload="auto"></audio>
-<audio id="audioDup"  preload="auto"></audio>
-<audio id="audioMiss" preload="auto"></audio>
 
 <script>
 /* ===== 多 CDN 容错加载 ===== */
@@ -206,87 +201,69 @@ let fileBase = "核对结果";
 let lastHitRow = -1;
 const $ = id => document.getElementById(id);
 
-/* =========================================================
-   【核心修复】用代码动态生成真实的 WAV 音频数据
-   之前给的 base64 是空数据，所以根本没声音。
-   这次直接合成正弦波形，写入 PCM 数据，生成真实能响的音频。
-   ========================================================= */
-function generateBeepUrl(freq, durationMs, volume) {
-  const sampleRate = 22050;
-  const numSamples = Math.floor(sampleRate * durationMs / 1000);
-  const buffer = new ArrayBuffer(44 + numSamples * 2);
-  const view = new DataView(buffer);
+/* ===== 音频（Web Audio API，只在用户点击时初始化） ===== */
+let audioCtx = null;
 
-  const writeStr = (offset, str) => {
-    for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
-  };
-
-  // WAV 头
-  writeStr(0, 'RIFF');
-  view.setUint32(4, 36 + numSamples * 2, true);
-  writeStr(8, 'WAVE');
-  writeStr(12, 'fmt ');
-  view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true);       // PCM
-  view.setUint16(22, 1, true);       // 单声道
-  view.setUint32(24, sampleRate, true);
-  view.setUint32(28, sampleRate * 2, true);
-  view.setUint16(32, 2, true);       // block align
-  view.setUint16(34, 16, true);      // bits per sample
-  writeStr(36, 'data');
-  view.setUint32(40, numSamples * 2, true);
-
-  // 正弦波 + 淡出
-  for (let i = 0; i < numSamples; i++) {
-    const t = i / sampleRate;
-    const fade = 1 - i / numSamples;
-    const v = Math.sin(2 * Math.PI * freq * t) * 32767 * volume * fade;
-    view.setInt16(44 + i * 2, v, true);
-  }
-
-  const blob = new Blob([buffer], { type: 'audio/wav' });
-  return URL.createObjectURL(blob);
-}
-
-// 页面加载时生成三个音效并绑定
-function setupAudioElements() {
+function initAudio() {
   try {
-    $("audioOk").src   = generateBeepUrl(1500, 130, 0.5); // 成功：高频短促
-    $("audioDup").src  = generateBeepUrl(1000, 80,  0.5); // 重复：中频
-    $("audioMiss").src = generateBeepUrl(350,  350, 0.6); // 失败：低频长鸣
-  } catch(e) { console.warn("生成音频失败", e); }
+    if (!audioCtx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (AC) audioCtx = new AC();
+    }
+    if (audioCtx && audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
+    // 播一段静音解锁
+    if (audioCtx) {
+      const o = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      g.gain.value = 0;
+      o.connect(g); g.connect(audioCtx.destination);
+      o.start(); o.stop(audioCtx.currentTime + 0.01);
+    }
+  } catch(e) { console.warn("initAudio failed", e); }
 }
 
-// 播放
 function playBeep(type) {
   try {
+    if (!audioCtx) return;
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const now = audioCtx.currentTime;
+
     if (type === 'ok') {
-      const a = $("audioOk"); a.currentTime = 0; a.play().catch(()=>{});
+      const o = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      o.type = 'sine';
+      o.frequency.value = 1500;
+      o.connect(g); g.connect(audioCtx.destination);
+      g.gain.setValueAtTime(0.35, now);
+      g.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+      o.start(now); o.stop(now + 0.15);
     } else if (type === 'dup') {
-      const a = $("audioDup"); a.currentTime = 0; a.play().catch(()=>{});
-      setTimeout(()=>{ try{ a.currentTime = 0; a.play().catch(()=>{}); }catch(e){} }, 130);
+      [0, 0.13].forEach(offset => {
+        const o = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        o.type = 'sine';
+        o.frequency.value = 1000;
+        o.connect(g); g.connect(audioCtx.destination);
+        g.gain.setValueAtTime(0.35, now + offset);
+        g.gain.exponentialRampToValueAtTime(0.001, now + offset + 0.08);
+        o.start(now + offset); o.stop(now + offset + 0.08);
+      });
     } else if (type === 'miss') {
-      const a = $("audioMiss"); a.currentTime = 0; a.play().catch(()=>{});
+      const o = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      o.type = 'sine';
+      o.frequency.value = 350;
+      o.connect(g); g.connect(audioCtx.destination);
+      g.gain.setValueAtTime(0.4, now);
+      g.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+      o.start(now); o.stop(now + 0.4);
     }
-  } catch(e) {}
+  } catch(e) { console.warn("playBeep failed", e); }
 }
 
-// 点击按钮时解锁 audio 标签（Safari 关键步）
-function unlockAudio() {
-  ['audioOk','audioDup','audioMiss'].forEach(id => {
-    const a = $(id);
-    if (a) {
-      a.volume = 0;
-      a.play().then(() => {
-        a.pause();
-        a.currentTime = 0;
-        a.volume = 1;
-      }).catch(()=>{ a.volume = 1; });
-    }
-  });
-}
-
-/* ---------- 语音播报（仅作辅助，Safari 上大概率无效） ---------- */
+/* 语音播报（辅助，Safari 上可能无效） */
 function speak(text){
   try{
     if (!window.speechSynthesis) return;
@@ -297,7 +274,7 @@ function speak(text){
   }catch(e){}
 }
 
-/* ---------- 通用 UI ---------- */
+/* ===== UI ===== */
 function toast(head, info, ms){
   const t = $("toast");
   let html = '<div class="head">' + head + '</div>';
@@ -307,7 +284,6 @@ function toast(head, info, ms){
   clearTimeout(t._tm);
   t._tm = setTimeout(()=> t.style.display = "none", ms || 2600);
 }
-
 function logMsg(cls, msg){
   const d = document.createElement("div");
   d.className = cls;
@@ -325,22 +301,11 @@ $("modalMask").onclick = e => { if(e.target === $("modalMask")) $("modalMask").c
 function hasGetUserMedia(){
   return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
 }
+function esc(s){
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
 
-// 页面加载时生成音频
-setupAudioElements();
-
-/* ---------- 定位功能 ---------- */
-$("btnLocate").onclick = () => {
-  if (lastHitRow < 0) { toast("提示", "还没有成功核对任何项目"); return; }
-  const wrap = document.querySelector(".table-wrap");
-  const tr = document.querySelector("tr[data-i='"+lastHitRow+"']");
-  if (wrap && tr) {
-    wrap.scrollTop = tr.offsetTop - wrap.clientHeight / 2 + tr.clientHeight / 2;
-    toast("已定位", "已滚动到最新核对行");
-  }
-};
-
-/* ---------- 上传解析 ---------- */
+/* ===== 上传解析 ===== */
 $("btnUpload").onclick = () => {
   const inp = document.createElement("input");
   inp.type = "file"; inp.accept = ".xlsx,.xls,.csv";
@@ -348,12 +313,19 @@ $("btnUpload").onclick = () => {
     const f = e.target.files[0]; if(!f) return;
     $("fileName").textContent = f.name;
     fileBase = f.name.replace(/\.[^.]+$/,"");
+    $("uploadBusy").style.display = "inline";
+    $("btnUpload").disabled = true;
+
     try {
-      const wb = XLSX.read(await f.arrayBuffer());
+      if (typeof XLSX === "undefined") throw new Error("XLSX 组件未加载，请检查网络后重试");
+
+      const buf = await f.arrayBuffer();
+      const wb = XLSX.read(buf);
       sheetName = wb.SheetNames[0];
       const ws = wb.Sheets[sheetName];
       const arr = XLSX.utils.sheet_to_json(ws, {header:1, defval:""});
       if(!arr.length){ toast("提示", "表格为空"); return; }
+
       headers = arr[0].map(h => String(h).trim());
       rows = arr.slice(1).filter(r => r.some(c => String(c).trim() !== ""));
       matchColIdx = headers.findIndex(h => h.toUpperCase() === "RML/RMD");
@@ -371,7 +343,13 @@ $("btnUpload").onclick = () => {
       $("scanCard").style.display = "block";
       $("tableCard").style.display = "block";
       toast("已读取 " + rows.length + " 行数据", "");
-    } catch(err){ toast("读取失败", err.message); }
+    } catch(err) {
+      console.error(err);
+      toast("读取失败", String(err && err.message || err));
+    } finally {
+      $("uploadBusy").style.display = "none";
+      $("btnUpload").disabled = false;
+    }
   };
   inp.click();
 };
@@ -394,7 +372,6 @@ function renderTable(){
   });
   $("grid").innerHTML = html;
 }
-function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 function updateStats(){
   $("statCard").style.display = "block";
   $("stTotal").textContent = rows.length;
@@ -402,14 +379,13 @@ function updateStats(){
   $("stLeft").textContent = rows.length - matchedSet.size;
 }
 
-/* 提取某行信息，拼接成一行可读文本（用于弹窗显示） */
+/* 提取行信息用于弹窗 */
 function getRowInfo(rowIndex) {
   const rowData = rows[rowIndex] || [];
   const parts = [];
   rowData.forEach((val, idx) => {
     const s = String(val).trim();
     if (s) {
-      // 每列加上表头，让信息更清晰
       const h = headers[idx] ? headers[idx] : ("列" + (idx + 1));
       parts.push(h + "：" + s);
     }
@@ -417,7 +393,18 @@ function getRowInfo(rowIndex) {
   return parts.join(" | ");
 }
 
-/* ---------- 核对逻辑 ---------- */
+/* ===== 定位 ===== */
+$("btnLocate").onclick = () => {
+  if (lastHitRow < 0) { toast("提示", "还没有成功核对任何项目"); return; }
+  const wrap = document.querySelector(".table-wrap");
+  const tr = document.querySelector("tr[data-i='"+lastHitRow+"']");
+  if (wrap && tr) {
+    wrap.scrollTop = tr.offsetTop - wrap.clientHeight / 2 + tr.clientHeight / 2;
+    toast("已定位", "已滚动到最新核对行");
+  }
+};
+
+/* ===== 核对逻辑 ===== */
 function check(code){
   code = String(code||"").trim(); if(!code) return;
   const list = codeIndex.get(code);
@@ -433,11 +420,9 @@ function check(code){
     logMsg("ok", ts + " ✅ 匹配成功：" + code);
     renderTable(); updateStats();
 
-    // ===== 核心修复：播真实音频 =====
     playBeep('ok');
-    speak("可以配送"); // 辅助语音（Safari上可能无效，但其他浏览器能用）
+    speak("可以配送");
 
-    // 弹窗显示 + 行信息
     const info = getRowInfo(hit);
     toast("✅ 已核对", info);
   } else if(dup){
@@ -454,9 +439,7 @@ function check(code){
   if(matchedSet.size === rows.length && rows.length) speak("核对完成");
 }
 
-/* =========================================================
-   扫码
-   ========================================================= */
+/* ===== 扫码 ===== */
 let camStream = null, camTrack = null, camVideo = null;
 let nativeDetector = null, scanning = false, starting = false;
 let scanTimer = null, loopBusy = false;
@@ -629,8 +612,7 @@ function cameraErrText(e){
 $("btnCamera").onclick = async () => {
   if(scanning || starting) return;
 
-  // 关键：用户点击时，立刻解锁音频标签
-  unlockAudio();
+  initAudio(); // 用户点击时激活音频权限
 
   if(!hasGetUserMedia()){
     popup("不支持摄像头", "请使用 Chrome 或系统自带浏览器打开，不要用微信内置浏览器。");
@@ -666,7 +648,7 @@ $("btnCamera").onclick = async () => {
 
 $("btnStop").onclick = () => { stopScan(); };
 
-/* ---------- 导出 ---------- */
+/* ===== 导出 ===== */
 $("btnExport").onclick = async () => {
   if(!rows.length) return;
   try{
