@@ -84,25 +84,36 @@
     display: none;
   }
 
-  /* 变焦滑块样式 */
-  #zoomControl {
+  /* 控制面板样式 */
+  #controlPanel {
     position: absolute;
-    bottom: 15px; left: 50%; transform: translateX(-50%);
-    width: 80%; max-width: 400px;
+    bottom: 10px; left: 50%; transform: translateX(-50%);
+    width: 90%; max-width: 440px;
     z-index: 30;
-    display: none; align-items: center; gap: 10px;
-    background: rgba(0,0,0,0.55);
-    padding: 8px 16px; border-radius: 20px;
+    display: none; flex-direction: column; gap: 8px;
+    background: rgba(0,0,0,0.6);
+    padding: 10px 16px; border-radius: 16px;
     backdrop-filter: blur(4px);
   }
-  #zoomControl span { color: #fff; font-size: 12px; font-weight: bold; white-space: nowrap; }
-  #zoomSlider { flex: 1; -webkit-appearance: none; appearance: none; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.3); outline: none; }
-  #zoomSlider::-webkit-slider-thumb {
+  .control-row { display: flex; align-items: center; gap: 10px; }
+  .control-row span { color: #fff; font-size: 12px; font-weight: bold; white-space: nowrap; min-width: 32px; }
+  .control-row input[type=range] {
+    flex: 1; -webkit-appearance: none; appearance: none; height: 4px; border-radius: 2px;
+    background: rgba(255,255,255,0.3); outline: none;
+  }
+  .control-row input[type=range]::-webkit-slider-thumb {
     -webkit-appearance: none; appearance: none;
     width: 20px; height: 20px; border-radius: 50%;
-    background: #0dcaf0; cursor: pointer;
-    box-shadow: 0 0 4px rgba(0,0,0,.5);
+    background: #0dcaf0; cursor: pointer; box-shadow: 0 0 4px rgba(0,0,0,.5);
   }
+  /* 变焦按钮组 */
+  #focusStepBtnGroup { display: none; gap: 8px; align-items: center; }
+  #focusStepBtnGroup button {
+    flex: 1; padding: 6px; font-size: 12px; font-weight: bold;
+    border: none; border-radius: 6px; background: #0dcaf0; color: #05323a;
+    cursor: pointer;
+  }
+  #focusStepBtnGroup button:active { background: #0bb5d6; }
 
   #logCard { display: none; }
   .log { max-height: 180px; overflow-y: auto; font-size: 13px; }
@@ -113,7 +124,6 @@
   table { border-collapse: collapse; font-size: 13px; width: max-content; min-width: 100%; }
   th, td { border: 1px solid #e3e7ee; padding: 7px 8px; text-align: left; white-space: nowrap; }
   th { background: #eef2f8; position: sticky; top: 0; z-index: 1; }
-  /* 修改：只标红命中的单元格，不再整行标红 */
   td.matched { background: #ffe3e3 !important; color: #b02a37; font-weight: 700; }
   .table-wrap { max-height: 50vh; overflow: auto; border-radius: 8px; -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y; }
   .hint { color: #666; font-size: 13px; line-height: 1.6; }
@@ -216,13 +226,30 @@
     <div id="reader">
       <div id="camStatus"></div>
       <div class="focus-ring" id="focusRing"></div>
-      <div id="zoomControl">
-        <span>变焦</span>
-        <input type="range" id="zoomSlider" min="1" max="8" step="0.1" value="1">
+      <!-- 摄像头控制面板 -->
+      <div id="controlPanel">
+        <!-- 变焦滑块 -->
+        <div class="control-row" id="zoomRow" style="display:none;">
+          <span>变焦</span>
+          <input type="range" id="zoomSlider" min="1" max="8" step="0.1" value="1">
+        </div>
+        <!-- 手动对焦距离滑块（如果支持） -->
+        <div class="control-row" id="focusDistanceRow" style="display:none;">
+          <span>对焦</span>
+          <input type="range" id="focusDistanceSlider" min="0" max="1" step="0.01" value="0.5">
+        </div>
+        <!-- 变焦步进微调按钮（如果不支持手动对焦距离，则用变焦步进触发对焦） -->
+        <div class="control-row" id="focusStepRow" style="display:none;">
+          <span>微调</span>
+          <div id="focusStepBtnGroup">
+            <button id="btnFocusMinus">- 对焦</button>
+            <button id="btnFocusPlus">+ 对焦</button>
+          </div>
+        </div>
       </div>
     </div>
     <div id="camTip" style="max-width:480px; margin:6px auto 0; text-align:center; font-size:12px; color:#666; display:none;">
-      💡 画面模糊时，点击画面任意位置可尝试手动对焦，底部滑块可调整变焦
+      💡 画面模糊时，点击画面任意位置可尝试对焦，底部控制面板可手动微调
     </div>
   </div>
 
@@ -636,7 +663,6 @@ $("btnChangeCol").onclick = () => {
     $("colBadge").style.display = "inline";
     $("colBadge").textContent = "核对模式：" + modeText(idx);
 
-    // 只重建索引，不重置 matchedCells / matchedSet / 日志
     buildIndex();
     renderTable(); updateStats();
 
@@ -654,7 +680,6 @@ function buildIndex(){
   if (matchColIdx === null || matchColIdx === undefined) return;
 
   if (matchColIdx === -1) {
-    // 全部列模式：索引所有单元格
     rows.forEach((r, i) => {
       r.forEach((val, j) => {
         const k = String(val ?? "").trim();
@@ -664,7 +689,6 @@ function buildIndex(){
       });
     });
   } else {
-    // 指定列模式
     rows.forEach((r, i) => {
       const k = String(r[matchColIdx] ?? "").trim();
       if (!k) return;
@@ -802,6 +826,50 @@ function showCamStatus(track) {
 }
 
 /* =========================================================
+   手动干预：对焦与微调控制
+   ========================================================= */
+async function applyManualFocus(track, value) {
+  if (!track) return;
+  try {
+    // 关键：手动模式下必须明确指定 focusDistance
+    const settings = track.getSettings();
+    await track.applyConstraints({
+      width: settings.width || { ideal: 1920 },
+      height: settings.height || { ideal: 1080 },
+      advanced: [{ focusMode: 'manual', focusDistance: value }]
+    });
+    console.log("[手动对焦] 距离设为:", value);
+  } catch (e) {
+    console.warn("手动对焦设置失败", e);
+  }
+}
+
+async function applyZoomBump(track, delta) {
+  if (!track) return;
+  try {
+    const caps = track.getCapabilities();
+    const settings = track.getSettings();
+    let currentZoom = settings.zoom || (caps.zoom ? caps.zoom.min : 1);
+    let targetZoom = currentZoom + delta;
+    if (caps.zoom) {
+      targetZoom = Math.max(caps.zoom.min, Math.min(caps.zoom.max, targetZoom));
+    }
+    await track.applyConstraints({
+      width: settings.width || { ideal: 1920 },
+      height: settings.height || { ideal: 1080 },
+      zoom: targetZoom
+    });
+    console.log("[变焦微调] 从", currentZoom, "调整到", targetZoom);
+    // 同步更新滑块显示
+    if ($("zoomSlider").style.display !== "none") {
+      $("zoomSlider").value = targetZoom;
+    }
+  } catch (e) {
+    console.warn("变焦微调失败", e);
+  }
+}
+
+/* =========================================================
    点击对焦：针对 Android 优化的务实方案
    ========================================================= */
 async function tryFocusAtPoint(track, x, y) {
@@ -815,7 +883,7 @@ async function tryFocusAtPoint(track, x, y) {
 
   console.log("[对焦] 尝试对焦，当前对焦能力:", caps.focusMode);
 
-  // 方案1：强制切回 continuous 模式（这是解决 manual 卡死的最佳方法）
+  // 方案1：强制切回 continuous 模式
   if (Array.isArray(caps.focusMode) && caps.focusMode.includes('continuous')) {
     try {
       await track.applyConstraints(Object.assign({}, baseConstraints, { advanced: [{ focusMode: 'continuous' }] }));
@@ -829,7 +897,6 @@ async function tryFocusAtPoint(track, x, y) {
     try {
       await track.applyConstraints(Object.assign({}, baseConstraints, { advanced: [{ focusMode: 'single-shot' }] }));
       console.log("[对焦] ✓ 已触发单次对焦");
-      // 延迟切回 continuous，防止卡死
       setTimeout(() => {
         if (Array.isArray(caps.focusMode) && caps.focusMode.includes('continuous')) {
           try { track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }); } catch(e){}
@@ -839,7 +906,7 @@ async function tryFocusAtPoint(track, x, y) {
     } catch(e) { console.warn("单次对焦失败", e); }
   }
 
-  // 方案3：变焦微调触发系统重对焦（非常有效的一招）
+  // 方案3：变焦微调触发系统重对焦
   if (caps.zoom && caps.zoom.max > caps.zoom.min) {
     try {
       const currentZoom = track.getSettings().zoom || caps.zoom.min;
@@ -947,7 +1014,6 @@ async function tuneTrackAfterStart(track) {
   try {
     const caps = (track.getCapabilities ? track.getCapabilities() : {}) || {};
 
-    // 优先强制连续自动对焦
     if (Array.isArray(caps.focusMode) && caps.focusMode.includes("continuous")) {
       try { await track.applyConstraints({ advanced: [{ focusMode: "continuous" }] }); }
       catch(e) { console.warn("初始连续对焦设置失败", e); }
@@ -999,11 +1065,18 @@ async function startNativeScan(){
   showCamStatus(camTrack);
   $("camTip").style.display = "block";
 
-  // ====== 变焦滑块初始化 ======
+  // ====== 控制面板初始化 ======
   const zoomSlider = $("zoomSlider");
-  const zoomControl = $("zoomControl");
-  const caps = camTrack.getCapabilities ? camTrack.getCapabilities() : {};
+  const zoomRow = $("zoomRow");
+  const focusDistanceSlider = $("focusDistanceSlider");
+  const focusDistanceRow = $("focusDistanceRow");
+  const focusStepRow = $("focusStepRow");
+  const controlPanel = $("controlPanel");
 
+  const caps = camTrack.getCapabilities ? camTrack.getCapabilities() : {};
+  let hasAnyControl = false;
+
+  // 1. 变焦滑块
   const browserSupportsZoom = navigator.mediaDevices.getSupportedConstraints().zoom;
   const deviceSupportsZoom = caps.zoom && caps.zoom.max > caps.zoom.min;
 
@@ -1012,7 +1085,8 @@ async function startNativeScan(){
       zoomSlider.max = caps.zoom.max;
       zoomSlider.step = (caps.zoom.max - caps.zoom.min) / 20;
       zoomSlider.value = camTrack.getSettings().zoom || caps.zoom.min;
-      zoomControl.style.display = "flex";
+      zoomRow.style.display = "flex";
+      hasAnyControl = true;
 
       zoomSlider.oninput = async (e) => {
           const val = parseFloat(e.target.value);
@@ -1020,18 +1094,48 @@ async function startNativeScan(){
               await camTrack.applyConstraints({ zoom: val });
           } catch (err) {
               console.error("变焦应用失败:", err.name, err.message);
-              if (err.name === 'OverconstrainedError') {
-                  toast("提示", "当前摄像头不支持此变焦级别");
-              } else if (err.name === 'NotAllowedError') {
-                  toast("提示", "请重新授权摄像头 PTZ 权限");
-              }
           }
       };
   } else {
-      zoomControl.style.display = "none";
-      console.warn("设备或浏览器不支持变焦功能", { browserSupportsZoom, deviceSupportsZoom, caps });
+      zoomRow.style.display = "none";
   }
-  // ====== 变焦滑块结束 ======
+
+  // 2. 手动对焦距离滑块（如果设备支持 focusDistance）
+  if (caps.focusDistance && caps.focusDistance.max > caps.focusDistance.min) {
+      focusDistanceSlider.min = caps.focusDistance.min;
+      focusDistanceSlider.max = caps.focusDistance.max;
+      focusDistanceSlider.step = caps.focusDistance.step || 0.01;
+      // 设置默认值，通常取中间值
+      let defaultVal = (caps.focusDistance.min + caps.focusDistance.max) / 2;
+      focusDistanceSlider.value = defaultVal;
+      focusDistanceRow.style.display = "flex";
+      hasAnyControl = true;
+
+      focusDistanceSlider.oninput = async (e) => {
+          const val = parseFloat(e.target.value);
+          await applyManualFocus(camTrack, val);
+      };
+  } else {
+      focusDistanceRow.style.display = "none";
+  }
+
+  // 3. 变焦步进按钮（如果不支持手动对焦距离，则显示这些按钮来触发对焦）
+  if (!caps.focusDistance || caps.focusDistance.max <= caps.focusDistance.min) {
+      focusStepRow.style.display = "flex";
+      hasAnyControl = true;
+
+      $("btnFocusMinus").onclick = () => applyZoomBump(camTrack, -0.2);
+      $("btnFocusPlus").onclick = () => applyZoomBump(camTrack, 0.2);
+  } else {
+      focusStepRow.style.display = "none";
+  }
+
+  if (hasAnyControl) {
+      controlPanel.style.display = "flex";
+  } else {
+      controlPanel.style.display = "none";
+  }
+  // ====== 控制面板初始化结束 ======
 
   video.addEventListener("click", async ev => {
     const rect = video.getBoundingClientRect();
@@ -1040,7 +1144,7 @@ async function startNativeScan(){
     const y = (ev.clientY - rect.top) / rect.height;
     const ok = await tryFocusAtPoint(camTrack, x, y);
     if (!ok) {
-      toast("提示", "当前设备或浏览器不支持网页手动对焦，请滑动变焦滑块试试");
+      toast("提示", "当前设备或浏览器不支持网页手动对焦，请使用底部控制面板微调");
     }
   });
 
@@ -1108,7 +1212,7 @@ async function stopScan(){
   $("readerWrap").style.display = "none";
   $("camTip").style.display = "none";
   $("camStatus").style.display = "none";
-  $("zoomControl").style.display = "none";
+  $("controlPanel").style.display = "none";
   $("btnCamera").style.display = "";
   $("btnStop").style.display = "none";
 }
@@ -1278,7 +1382,7 @@ $("btnClearStorage").onclick = function() {
   $("btnStop").style.display = "none";
   $("uploadBusy").style.display = "none";
   $("btnUpload").disabled = false;
-  $("zoomControl").style.display = "none";
+  $("controlPanel").style.display = "none";
 
   try { deleteTableData(); } catch(e) {}
   try { deleteLogFromDB(); } catch(e) {}
