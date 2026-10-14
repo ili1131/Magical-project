@@ -558,36 +558,166 @@ if(matchColIdx===-1){rows.forEach((row,i)=>{row.forEach((val,j)=>{evalCell(i,j,v
 else if(matchColIdx>=0){rows.forEach((row,i)=>{evalCell(i,matchColIdx,row[matchColIdx])})}
 candidates.sort((a,b)=>b.score-a.score);return candidates.slice(0,5)}
 
-/* 语音识别 */
+/* 语音识别 —— 安卓自动重启版 */
 let voiceRec=null,voiceRawText="",voiceNormalizedText="",voiceSilenceTimer=null,voiceActive=false;
-function getSpeechRecognitionClass(){return window.SpeechRecognition||window.webkitSpeechRecognition||null}
-function startVoiceRecognition(){const SR=getSpeechRecognitionClass();
-if(!SR){popup("不支持语音识别","当前浏览器不支持网页语音识别。<br><br>建议使用：<br>• Android Chrome / Edge<br>• iOS Safari 14.5+<br>• 桌面 Chrome / Edge<br><br>微信内置浏览器不支持，请用系统浏览器打开。");return}
-voiceRawText="";voiceNormalizedText="";voiceActive=true;
-$("voiceRawText").textContent="（等待语音…）";$("voiceNormalizedText").textContent="—";$("voiceStatus").textContent="🎤 正在聆听… 请读出条码";$("voiceConfirmBtn").disabled=true;$("voiceMask").classList.add("show");
-try{voiceRec=new SR();voiceRec.lang='zh-CN';voiceRec.continuous=true;voiceRec.interimResults=true;voiceRec.maxAlternatives=1;
-voiceRec.onresult=(e)=>{let interim="";for(let i=e.resultIndex;i<e.results.length;i++){const t=e.results[i][0].transcript;if(e.results[i].isFinal){voiceRawText+=t}else{interim+=t}}
-const displayRaw=voiceRawText+interim;const norm=basicNormalize(displayRaw);
-$("voiceRawText").textContent=displayRaw||"（等待语音…）";$("voiceNormalizedText").textContent=norm||"—";if(norm)$("voiceConfirmBtn").disabled=false;
-clearTimeout(voiceSilenceTimer);voiceSilenceTimer=setTimeout(()=>{try{voiceRec.stop()}catch(e){}},1500)};
-voiceRec.onerror=(e)=>{console.warn("[语音] 错误:",e.error);
-if(e.error==='not-allowed'||e.error==='service-not-allowed'){$("voiceStatus").textContent="❌ 麦克风权限被拒绝，请在浏览器设置中允许"}
-else if(e.error==='no-speech'){$("voiceStatus").textContent="❌ 没有检测到语音，请点「重说」"}
-else if(e.error==='network'){$("voiceStatus").textContent="❌ 网络错误，请检查网络后重试"}
-else{$("voiceStatus").textContent="❌ 识别出错："+e.error}
-voiceActive=false};
-voiceRec.onend=()=>{voiceActive=false;clearTimeout(voiceSilenceTimer);const norm=basicNormalize(voiceRawText);voiceNormalizedText=norm;
-if(norm){$("voiceStatus").textContent="✅ 识别完成，请点「查找匹配」";$("voiceConfirmBtn").disabled=false}
-else{$("voiceStatus").textContent="⚠️ 没有识别到内容，请点「重说」";$("voiceConfirmBtn").disabled=true}};
-voiceRec.start()}catch(err){console.error("[语音] 启动失败:",err);$("voiceStatus").textContent="❌ 无法启动语音识别："+(err.message||err);voiceActive=false}}
+let voiceRestarting=false;            // 防止 onend 反复重启
+let voiceManuallyStopped=false;       // 用户主动取消/重说/确认时置 true，阻止自动重启
+let voiceRestartCount=0;              // 重启次数上限，避免死循环
 
-function stopVoiceRecognition(){clearTimeout(voiceSilenceTimer);voiceSilenceTimer=null;if(voiceRec){try{voiceRec.stop()}catch(e){}try{voiceRec.abort()}catch(e){}voiceRec=null}voiceActive=false}
-function closeVoicePanel(){stopVoiceRecognition();$("voiceMask").classList.remove("show")}
+function getSpeechRecognitionClass(){return window.SpeechRecognition||window.webkitSpeechRecognition||null}
+
+function startVoiceRecognition(){
+  const SR=getSpeechRecognitionClass();
+  if(!SR){
+    popup("不支持语音识别","当前浏览器不支持网页语音识别。<br><br>建议使用：<br>• Android Chrome / Edge<br>• iOS Safari 14.5+<br>• 桌面 Chrome / Edge<br><br>微信内置浏览器不支持，请用系统浏览器打开。");
+    return;
+  }
+  voiceRawText="";voiceNormalizedText="";
+  voiceActive=true;
+  voiceManuallyStopped=false;
+  voiceRestartCount=0;
+
+  $("voiceRawText").textContent="（等待语音…）";
+  $("voiceNormalizedText").textContent="—";
+  $("voiceStatus").textContent="🎤 正在聆听… 请读出条码";
+  $("voiceConfirmBtn").disabled=true;
+  $("voiceMask").classList.add("show");
+
+  createAndStartRecognizer();
+}
+
+function createAndStartRecognizer(){
+  const SR=getSpeechRecognitionClass();
+  if(!SR){return}
+  try{
+    voiceRec=new SR();
+    voiceRec.lang='zh-CN';
+    // 安卓上 continuous=true 会导致立即结束或行为异常，统一设为 false，用 onend 自动重启模拟持续监听
+    voiceRec.continuous=false;
+    voiceRec.interimResults=true;
+    voiceRec.maxAlternatives=1;
+
+    voiceRec.onresult=(e)=>{
+      let interim="";
+      for(let i=e.resultIndex;i<e.results.length;i++){
+        const t=e.results[i][0].transcript;
+        if(e.results[i].isFinal){voiceRawText+=t}
+        else{interim+=t}
+      }
+      const displayRaw=voiceRawText+interim;
+      const norm=basicNormalize(displayRaw);
+      $("voiceRawText").textContent=displayRaw||"（等待语音…）";
+      $("voiceNormalizedText").textContent=norm||"—";
+      if(norm)$("voiceConfirmBtn").disabled=false;
+
+      // 静音 1.5 秒后主动 stop，触发 onend
+      clearTimeout(voiceSilenceTimer);
+      voiceSilenceTimer=setTimeout(()=>{
+        try{voiceRec.stop()}catch(e){}
+      },1500);
+    };
+
+    voiceRec.onerror=(e)=>{
+      console.warn("[语音] 错误:",e.error);
+      if(e.error==='not-allowed'||e.error==='service-not-allowed'){
+        $("voiceStatus").textContent="❌ 麦克风权限被拒绝，请在浏览器设置中允许";
+        voiceManuallyStopped=true;
+        voiceActive=false;
+      }else if(e.error==='no-speech'){
+        // 没检测到语音：不算致命错误，交给 onend 决定是否重启
+        $("voiceStatus").textContent="🎤 未检测到语音，继续聆听…";
+      }else if(e.error==='network'){
+        $("voiceStatus").textContent="❌ 网络错误，请检查网络后重试";
+        voiceManuallyStopped=true;
+        voiceActive=false;
+      }else if(e.error==='aborted'){
+        // 主动 stop 会触发 aborted，属于正常流程，忽略
+      }else{
+        $("voiceStatus").textContent="❌ 识别出错："+e.error;
+      }
+    };
+
+    voiceRec.onend=()=>{
+      clearTimeout(voiceSilenceTimer);
+      voiceSilenceTimer=null;
+
+      const norm=basicNormalize(voiceRawText);
+      voiceNormalizedText=norm;
+
+      // 用户已点取消/重说/确认，或权限被拒 → 不再重启
+      if(voiceManuallyStopped||!voiceActive){
+        voiceActive=false;
+        if(norm){
+          $("voiceStatus").textContent="✅ 识别完成，请点「查找匹配」";
+          $("voiceConfirmBtn").disabled=false;
+        }else{
+          $("voiceStatus").textContent="⚠️ 没有识别到内容，请点「重说」";
+          $("voiceConfirmBtn").disabled=true;
+        }
+        return;
+      }
+
+      // 已经识别到内容 → 不再自动重启，交给用户点「查找匹配」
+      if(norm){
+        voiceActive=false;
+        $("voiceStatus").textContent="✅ 识别完成，请点「查找匹配」";
+        $("voiceConfirmBtn").disabled=false;
+        return;
+      }
+
+      // 没有内容，且重启次数未超限 → 自动重启继续聆听（安卓核心修复点）
+      if(voiceRestartCount>=5){
+        voiceActive=false;
+        $("voiceStatus").textContent="⚠️ 没有识别到内容，请点「重说」";
+        $("voiceConfirmBtn").disabled=true;
+        return;
+      }
+
+      voiceRestartCount++;
+      voiceRestarting=true;
+      $("voiceStatus").textContent="🎤 继续聆听…";
+      setTimeout(()=>{
+        voiceRestarting=false;
+        if(voiceActive&&!voiceManuallyStopped){
+          createAndStartRecognizer();
+        }
+      },120);
+    };
+
+    voiceRec.start();
+  }catch(err){
+    console.error("[语音] 启动失败:",err);
+    $("voiceStatus").textContent="❌ 无法启动语音识别："+(err.message||err);
+    voiceActive=false;
+  }
+}
+
+function stopVoiceRecognition(){
+  clearTimeout(voiceSilenceTimer);
+  voiceSilenceTimer=null;
+  voiceManuallyStopped=true;
+  voiceActive=false;
+  if(voiceRec){
+    try{voiceRec.stop()}catch(e){}
+    try{voiceRec.abort()}catch(e){}
+    voiceRec=null;
+  }
+}
+function closeVoicePanel(){
+  stopVoiceRecognition();
+  $("voiceMask").classList.remove("show");
+}
 
 $("btnVoice").onclick=()=>{initAudioAndUnlock();startVoiceRecognition()};
 $("voiceCancelBtn").onclick=()=>{closeVoicePanel()};
 $("voiceRetryBtn").onclick=()=>{stopVoiceRecognition();setTimeout(()=>startVoiceRecognition(),200)};
-$("voiceConfirmBtn").onclick=()=>{const raw=(voiceRawText||"").trim();if(!raw){toast("提示","没有可提交的内容");return}closeVoicePanel();showFuzzyMatch(raw)};
+$("voiceConfirmBtn").onclick=()=>{
+  const raw=(voiceRawText||"").trim();
+  if(!raw){toast("提示","没有可提交的内容");return}
+  stopVoiceRecognition();
+  $("voiceMask").classList.remove("show");
+  showFuzzyMatch(raw);
+};
 document.addEventListener("visibilitychange",function(){if(document.hidden&&voiceActive){closeVoicePanel()}});
 
 /* 模糊匹配弹窗 */
