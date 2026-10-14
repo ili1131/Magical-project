@@ -38,41 +38,19 @@
   .table-wrap { max-height: 50vh; overflow: auto; border-radius: 8px; -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y; }
   .hint { color: #666; font-size: 13px; line-height: 1.6; }
   #fileName { font-size: 13px; color: #0b5ed7; margin-left: 6px; word-break: break-all; }
-
   .toast {
-    position: fixed;
-    left: 50%;
-    bottom: 60px;
-    transform: translateX(-50%);
-    background: rgba(0,0,0,.88);
-    color: #fff;
-    padding: 14px 22px;
-    border-radius: 18px;
-    font-size: 15px;
-    display: none;
-    z-index: 99;
-    max-width: 90vw;
-    text-align: center;
-    line-height: 1.6;
-    word-break: break-word;
-    box-shadow: 0 6px 20px rgba(0,0,0,.4);
+    position: fixed; left: 50%; bottom: 60px; transform: translateX(-50%);
+    background: rgba(0,0,0,.88); color: #fff; padding: 14px 22px; border-radius: 18px;
+    font-size: 15px; display: none; z-index: 99; max-width: 90vw; text-align: center;
+    line-height: 1.6; word-break: break-word; box-shadow: 0 6px 20px rgba(0,0,0,.4);
   }
   .toast .head { font-size: 16px; font-weight: 700; }
   .toast .info { display: block; font-size: 13px; font-weight: 400; color: #ffd75e; margin-top: 6px; }
-
   #loadStatus { position: fixed; inset: 0; background: rgba(255,255,255,.92); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; z-index: 100; font-size: 15px; color: #333; }
   .spinner { width: 36px; height: 36px; border: 4px solid #dbe4f0; border-top-color: #0b5ed7; border-radius: 50%; animation: spin 1s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
   #loadRetry { display: none; }
-
-  /* 上传文件时的局部加载提示 */
-  #uploadBusy {
-    display: none;
-    margin-left: 8px;
-    font-size: 13px;
-    color: #0b5ed7;
-  }
-
+  #uploadBusy { display: none; margin-left: 8px; font-size: 13px; color: #0b5ed7; }
   #envWarn { display: none; background: #fff3cd; color: #7a5b00; border: 1px solid #ffe69c; border-radius: 10px; padding: 10px 12px; font-size: 13px; line-height: 1.6; margin-bottom: 14px; }
   #envWarn b { color: #b02a37; }
   #modalMask { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: none; align-items: center; justify-content: center; z-index: 200; padding: 18px; }
@@ -145,52 +123,49 @@
 </div>
 
 <script>
-/* ===== 多 CDN 容错加载 ===== */
+/* ===== 多 CDN 容错加载（国内优先 + 并行 + XLSX 就绪即可用） ===== */
 var LIBS = {
   XLSX: [
+    "https://cdn.bootcdn.net/ajax/libs/xlsx/0.18.5/xlsx.full.min.js",
+    "https://cdn.staticfile.org/xlsx/0.18.5/xlsx.full.min.js",
     "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js",
-    "https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js",
-    "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js",
-    "https://cdn.bootcdn.net/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"
+    "https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"
   ],
   ExcelJS: [
+    "https://cdn.bootcdn.net/ajax/libs/exceljs/4.4.0/exceljs.min.js",
+    "https://cdn.staticfile.org/exceljs/4.4.0/exceljs.min.js",
     "https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js",
-    "https://unpkg.com/exceljs@4.4.0/dist/exceljs.min.js",
-    "https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js",
-    "https://cdn.bootcdn.net/ajax/libs/exceljs/4.4.0/exceljs.min.js"
+    "https://unpkg.com/exceljs@4.4.0/dist/exceljs.min.js"
   ],
   Html5Qrcode: [
+    "https://cdn.bootcdn.net/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js",
+    "https://cdn.staticfile.org/html5-qrcode/2.3.8/html5-qrcode.min.js",
     "https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js",
-    "https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js",
-    "https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js",
-    "https://cdn.bootcdn.net/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"
+    "https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"
   ]
 };
 function loadOne(urls, i, ok, fail){
   if(i >= urls.length){ fail(); return; }
   var s = document.createElement("script");
   s.src = urls[i];
+  s.async = true;
   s.onload = ok;
   s.onerror = function(){ loadOne(urls, i+1, ok, fail); };
   document.head.appendChild(s);
 }
-function loadAll(names, done){
-  if(!names.length){ done(true); return; }
-  var name = names[0];
-  loadOne(LIBS[name], 0, function(){ loadAll(names.slice(1), done); },
-    function(){ done(false, name); });
-}
-loadAll(["XLSX","ExcelJS","Html5Qrcode"], function(ok, which){
-  var st = document.getElementById("loadStatus");
-  if(ok){
-    st.style.display = "none";
-    document.getElementById("btnUpload").disabled = false;
-  } else {
-    document.getElementById("loadText").textContent = "组件 " + which + " 加载失败，请检查网络后重试";
-    document.getElementById("loadText").style.color = "#dc3545";
-    document.getElementById("loadRetry").style.display = "inline-block";
-    st.querySelector(".spinner").style.display = "none";
-  }
+
+/* 关键：XLSX 优先，加载完就立即可用；其他两个后台慢慢加载 */
+loadOne(LIBS.XLSX, 0, function(){
+  document.getElementById("loadStatus").style.display = "none";
+  document.getElementById("btnUpload").disabled = false;
+  // 后台加载其余两个库，不阻塞用户
+  loadOne(LIBS.ExcelJS, 0, function(){}, function(){});
+  loadOne(LIBS.Html5Qrcode, 0, function(){}, function(){});
+}, function(){
+  document.getElementById("loadText").textContent = "表格组件加载失败，请检查网络后重试";
+  document.getElementById("loadText").style.color = "#dc3545";
+  document.getElementById("loadRetry").style.display = "inline-block";
+  document.querySelector(".spinner").style.display = "none";
 });
 </script>
 
@@ -201,69 +176,81 @@ let fileBase = "核对结果";
 let lastHitRow = -1;
 const $ = id => document.getElementById(id);
 
-/* ===== 音频（Web Audio API，只在用户点击时初始化） ===== */
+/* =========================================================
+   【音频核心修复】
+   iOS Safari 的 Web Audio API 解锁规则：
+   用户在点击按钮后，必须"真正听到一个声音"才算解锁。
+   如果只播静音，Safari 会认为"用户没听到=没授权"，后续全部静音。
+   所以这里在点击"开启摄像头"时，强制播放一个真实的"嘀"声。
+   ========================================================= */
 let audioCtx = null;
 
-function initAudio() {
-  try {
-    if (!audioCtx) {
-      const AC = window.AudioContext || window.webkitAudioContext;
-      if (AC) audioCtx = new AC();
-    }
-    if (audioCtx && audioCtx.state === 'suspended') {
-      audioCtx.resume();
-    }
-    // 播一段静音解锁
-    if (audioCtx) {
-      const o = audioCtx.createOscillator();
-      const g = audioCtx.createGain();
-      g.gain.value = 0;
-      o.connect(g); g.connect(audioCtx.destination);
-      o.start(); o.stop(audioCtx.currentTime + 0.01);
-    }
-  } catch(e) { console.warn("initAudio failed", e); }
+function ensureCtx() {
+  if (!audioCtx) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (AC) audioCtx = new AC();
+  }
+  return audioCtx;
 }
 
+function doPlay(freq, durationMs, volume) {
+  const ctx = ensureCtx();
+  if (!ctx) return;
+  try {
+    const now = ctx.currentTime;
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = 'sine';
+    o.frequency.value = freq;
+    o.connect(g); g.connect(ctx.destination);
+    g.gain.setValueAtTime(volume, now);
+    g.gain.exponentialRampToValueAtTime(0.001, now + durationMs / 1000);
+    o.start(now);
+    o.stop(now + durationMs / 1000);
+  } catch(e) { console.warn("doPlay failed", e); }
+}
+
+/* 双响（重复扫描用） */
+function doDoublePlay(freq, durationMs, volume) {
+  doPlay(freq, durationMs, volume);
+  setTimeout(()=> doPlay(freq, durationMs, volume), 140);
+}
+
+/* 用户点击"开启摄像头"时调用：真实播放一声，解锁 Safari 音频 */
+function initAudioAndUnlock() {
+  const ctx = ensureCtx();
+  if (!ctx) return;
+  const fire = () => {
+    // 播放真实的一声"嘀"，这是解锁 Safari 的关键
+    doPlay(1500, 130, 0.35);
+  };
+  if (ctx.state === 'suspended') {
+    ctx.resume().then(fire).catch(fire);
+  } else {
+    fire();
+  }
+}
+
+/* 扫码时播放的提示音 */
 function playBeep(type) {
-  try {
-    if (!audioCtx) return;
-    if (audioCtx.state === 'suspended') audioCtx.resume();
-    const now = audioCtx.currentTime;
-
+  const ctx = ensureCtx();
+  if (!ctx) return;
+  const fire = () => {
     if (type === 'ok') {
-      const o = audioCtx.createOscillator();
-      const g = audioCtx.createGain();
-      o.type = 'sine';
-      o.frequency.value = 1500;
-      o.connect(g); g.connect(audioCtx.destination);
-      g.gain.setValueAtTime(0.35, now);
-      g.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
-      o.start(now); o.stop(now + 0.15);
+      doPlay(1500, 130, 0.4);
     } else if (type === 'dup') {
-      [0, 0.13].forEach(offset => {
-        const o = audioCtx.createOscillator();
-        const g = audioCtx.createGain();
-        o.type = 'sine';
-        o.frequency.value = 1000;
-        o.connect(g); g.connect(audioCtx.destination);
-        g.gain.setValueAtTime(0.35, now + offset);
-        g.gain.exponentialRampToValueAtTime(0.001, now + offset + 0.08);
-        o.start(now + offset); o.stop(now + offset + 0.08);
-      });
+      doDoublePlay(1000, 90, 0.4);
     } else if (type === 'miss') {
-      const o = audioCtx.createOscillator();
-      const g = audioCtx.createGain();
-      o.type = 'sine';
-      o.frequency.value = 350;
-      o.connect(g); g.connect(audioCtx.destination);
-      g.gain.setValueAtTime(0.4, now);
-      g.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
-      o.start(now); o.stop(now + 0.4);
+      doPlay(350, 380, 0.45);
     }
-  } catch(e) { console.warn("playBeep failed", e); }
+  };
+  if (ctx.state === 'suspended') {
+    ctx.resume().then(fire).catch(fire);
+  } else {
+    fire();
+  }
 }
 
-/* 语音播报（辅助，Safari 上可能无效） */
 function speak(text){
   try{
     if (!window.speechSynthesis) return;
@@ -320,10 +307,10 @@ $("btnUpload").onclick = () => {
       if (typeof XLSX === "undefined") throw new Error("XLSX 组件未加载，请检查网络后重试");
 
       const buf = await f.arrayBuffer();
-      const wb = XLSX.read(buf);
+      const wb = XLSX.read(buf, { type: "array" });
       sheetName = wb.SheetNames[0];
       const ws = wb.Sheets[sheetName];
-      const arr = XLSX.utils.sheet_to_json(ws, {header:1, defval:""});
+      const arr = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "", raw: true });
       if(!arr.length){ toast("提示", "表格为空"); return; }
 
       headers = arr[0].map(h => String(h).trim());
@@ -379,7 +366,6 @@ function updateStats(){
   $("stLeft").textContent = rows.length - matchedSet.size;
 }
 
-/* 提取行信息用于弹窗 */
 function getRowInfo(rowIndex) {
   const rowData = rows[rowIndex] || [];
   const parts = [];
@@ -612,7 +598,8 @@ function cameraErrText(e){
 $("btnCamera").onclick = async () => {
   if(scanning || starting) return;
 
-  initAudio(); // 用户点击时激活音频权限
+  // 【关键修复】用户点击时立即真实播放一声，彻底解锁 iOS Safari 音频
+  initAudioAndUnlock();
 
   if(!hasGetUserMedia()){
     popup("不支持摄像头", "请使用 Chrome 或系统自带浏览器打开，不要用微信内置浏览器。");
@@ -651,6 +638,10 @@ $("btnStop").onclick = () => { stopScan(); };
 /* ===== 导出 ===== */
 $("btnExport").onclick = async () => {
   if(!rows.length) return;
+  if (typeof ExcelJS === "undefined") {
+    toast("导出组件未加载完成", "请稍后再试，或刷新页面");
+    return;
+  }
   try{
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet(sheetName || "核对结果");
