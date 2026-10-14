@@ -17,15 +17,50 @@
   .btn-success { background: #198754; color: #fff; }
   .btn-danger  { background: #dc3545; color: #fff; }
   .btn-secondary { background: #6c757d; color: #fff; }
+  .btn-warning { background: #fd7e14; color: #fff; }
   .btn:disabled { opacity: .45; cursor: not-allowed; }
   .stats { display: flex; gap: 10px; flex-wrap: wrap; }
   .stat { flex: 1; min-width: 90px; background: #f0f4fa; border-radius: 10px; padding: 10px; text-align: center; }
   .stat b { display: block; font-size: 22px; }
+
+  /* 摄像头容器 */
   #reader { position: relative; width: 100%; max-width: 480px; margin: 10px auto 0; display: none; border-radius: 10px; overflow: hidden; background: #000; }
   #reader video { width: 100%; display: block; background: #000; object-fit: cover; }
-  .scan-frame { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 82%; height: 40%; border: 2px solid rgba(255,80,80,.9); border-radius: 10px; box-shadow: 0 0 0 9999px rgba(0,0,0,.2); pointer-events: none; }
+  .scan-frame { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 82%; height: 40%; border: 2px solid rgba(255,80,80,.9); border-radius: 10px; box-shadow: 0 0 0 9999px rgba(0,0,0,.2); pointer-events: none; z-index: 10; }
   .scan-frame::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 2px; background: rgba(255,80,80,.85); animation: scanline 2s ease-in-out infinite; }
   @keyframes scanline { 0%,100% { top: 8%; } 50% { top: 92%; } }
+
+  /* 信息显示区：固定在摄像头底部，居中，不滚动，直到下一条替换 */
+  .barrage-wrap {
+    position: absolute;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    max-width: 92%;
+    pointer-events: none;
+    z-index: 20;
+    display: flex;
+    justify-content: center;
+  }
+  .barrage-item {
+    display: none;
+    white-space: nowrap;
+    color: #fff;
+    background: rgba(0, 0, 0, 0.72);
+    padding: 6px 16px;
+    border-radius: 18px;
+    font-size: 13px;
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: center;
+    line-height: 1.4;
+  }
+  .barrage-item.show { display: inline-block; }
+  .barrage-item .rml { color: #ffc107; margin-right: 6px; }
+
   .log { max-height: 180px; overflow-y: auto; font-size: 13px; margin-top: 10px; border-top: 1px dashed #ddd; padding-top: 8px; }
   .log .ok { color: #198754; }
   .log .dup { color: #fd7e14; }
@@ -78,7 +113,12 @@
   <div class="card" id="scanCard" style="display:none">
     <button class="btn btn-success" id="btnCamera">② 开启摄像头实时扫描</button>
     <button class="btn btn-danger" id="btnStop" style="display:none">停止扫描</button>
-    <div id="reader"></div>
+    <div id="reader">
+      <!-- 信息显示区 -->
+      <div class="barrage-wrap" id="barrageWrap">
+        <div class="barrage-item" id="barrageItem"></div>
+      </div>
+    </div>
     <div class="hint" style="margin-top:6px; color:#dc3545;">
       ⚠️ 如果在微信中打开，请点击右上角“在浏览器中打开”。推荐使用 Chrome 或系统自带浏览器，扫码更清晰。
     </div>
@@ -95,6 +135,7 @@
 
   <div class="card" id="tableCard" style="display:none">
     <button class="btn btn-success" id="btnExport">③ 导出核对结果并分享</button>
+    <button class="btn btn-warning" id="btnLocate">📍 定位最后核对项</button>
     <span id="exportName" class="hint"></span>
     <div class="table-wrap" style="margin-top:10px"><table id="grid"></table></div>
   </div>
@@ -168,7 +209,43 @@ loadAll(["XLSX","ExcelJS","Html5Qrcode"], function(ok, which){
 let sheetName = "", headers = [], rows = [];
 let matchColIdx = -1, matchedSet = new Set(), codeIndex = new Map();
 let fileBase = "核对结果";
+let lastHitRow = -1; 
 const $ = id => document.getElementById(id);
+
+/* ===== 信息显示（固定在摄像头底部，直到下一条替换） ===== */
+function showBarrage(rowIndex) {
+  const item = $("barrageItem");
+  if (!item) return;
+
+  const rowData = rows[rowIndex] || [];
+  let textParts = [];
+  rowData.forEach((val, idx) => {
+    const s = String(val).trim();
+    if (s) {
+      if (idx === matchColIdx) {
+        textParts.push(`<span class="rml">${esc(s)}</span>`);
+      } else {
+        textParts.push(esc(s));
+      }
+    }
+  });
+
+  let fullText = textParts.join(" | ");
+  if (fullText.length > 60) {
+    fullText = fullText.substring(0, 60) + "...";
+  }
+
+  item.innerHTML = fullText;
+  item.classList.add("show");
+}
+
+function clearBarrage() {
+  const item = $("barrageItem");
+  if (item) {
+    item.innerHTML = "";
+    item.classList.remove("show");
+  }
+}
 
 /* ===== 音频处理（针对 Safari 深度优化） ===== */
 let audioCtx = null;
@@ -291,6 +368,20 @@ function hasGetUserMedia(){
 
 setupAudioElements();
 
+/* ---------- 定位功能 ---------- */
+$("btnLocate").onclick = () => {
+  if (lastHitRow < 0) {
+    toast("还没有成功核对任何项目");
+    return;
+  }
+  const wrap = document.querySelector(".table-wrap");
+  const tr = document.querySelector("tr[data-i='"+lastHitRow+"']");
+  if (wrap && tr) {
+    wrap.scrollTop = tr.offsetTop - wrap.clientHeight / 2 + tr.clientHeight / 2;
+    toast("已定位到最新核对行");
+  }
+};
+
 /* ---------- 上传解析 ---------- */
 $("btnUpload").onclick = () => {
   const inp = document.createElement("input");
@@ -315,6 +406,8 @@ $("btnUpload").onclick = () => {
       $("colBadge").textContent = "核对列：" + headers[matchColIdx];
 
       matchedSet = new Set();
+      lastHitRow = -1; 
+      clearBarrage();
       buildIndex();
       renderTable(); updateStats();
 
@@ -364,11 +457,15 @@ function check(code){
   const ts = new Date().toLocaleTimeString();
   if(hit >= 0){
     matchedSet.add(hit);
+    lastHitRow = hit; 
     logMsg("ok", ts + " ✅ 匹配成功：" + code);
     renderTable(); updateStats();
     
     playBeep('ok');
-    speak("可以配送"); // 修改：成功语音
+    speak("可以配送"); 
+    
+    // 更新显示信息（会覆盖上一条）
+    showBarrage(hit);
     
     toast("✅ 已标红：" + code);
   } else if(dup){
@@ -379,7 +476,7 @@ function check(code){
   } else {
     logMsg("miss", ts + " ❌ 未在表格中找到：" + code);
     playBeep('miss');
-    speak("不可配送，需滞留"); // 修改：失败语音
+    speak("不可配送，需滞留"); 
     toast("❌ 未找到该条码");
   }
   if(matchedSet.size === rows.length && rows.length) speak("核对完成");
@@ -430,18 +527,21 @@ async function startNativeScan(){
   if(!det) throw new Error("no-native-detector");
 
   const container = $("reader");
+  // 保留弹幕区，只清空视频/扫描框
+  const oldWrap = $("barrageWrap");
   container.innerHTML = "";
+  container.appendChild(oldWrap);
 
   const video = document.createElement("video");
   video.setAttribute("playsinline", "");
   video.setAttribute("muted", "");
   video.autoplay = true;
   video.muted = true;
-  container.appendChild(video);
+  container.insertBefore(video, oldWrap);
 
   const overlay = document.createElement("div");
   overlay.className = "scan-frame";
-  container.appendChild(overlay);
+  container.insertBefore(overlay, oldWrap);
 
   let stream = null, lastErr = null;
   try {
@@ -503,8 +603,11 @@ async function scanLoop(){
 async function startFallbackScan(){
   if(typeof Html5Qrcode === "undefined") throw new Error("扫码库未加载");
   fallbackMode = true;
-  const el = $("reader");
-  el.innerHTML = "";
+  const container = $("reader");
+  const oldWrap = $("barrageWrap");
+  container.innerHTML = "";
+  container.appendChild(oldWrap);
+
   scanner = new Html5Qrcode("reader", false);
   await scanner.start(
     { facingMode: "environment" },
@@ -539,7 +642,9 @@ async function stopScan(){
   }
   stopCamStream();
   const el = $("reader");
+  const oldWrap = $("barrageWrap");
   el.innerHTML = "";
+  el.appendChild(oldWrap);
   el.style.display = "none";
   $("btnCamera").style.display = "inline-block";
   $("btnStop").style.display = "none";
@@ -577,7 +682,9 @@ $("btnCamera").onclick = async () => {
       catch(e){
         console.warn("原生扫码不可用，回退降级方案：", e);
         stopCamStream();
+        const oldWrap = $("barrageWrap");
         $("reader").innerHTML = "";
+        $("reader").appendChild(oldWrap);
       }
     }
     if(!ok){ await startFallbackScan(); }
