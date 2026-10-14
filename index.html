@@ -5,1773 +5,557 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>飞利浦收货核对</title>
 <style>
-  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; margin: 0; background: #f4f6f9; color: #1a1a2e; }
-  header { background: #0b5ed7; color: #fff; padding: 14px 16px; display: flex; align-items: center; gap: 10px; }
-  header h1 { font-size: 18px; margin: 0; flex: 1; }
-  .badge { background: rgba(255,255,255,.2); border-radius: 20px; padding: 3px 10px; font-size: 12px; }
-  main { max-width: 960px; margin: 0 auto; padding: 14px; }
-  .card { background: #fff; border-radius: 12px; padding: 14px; margin-bottom: 14px; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
-
-  .btn { display: inline-block; border: none; border-radius: 10px; padding: 12px 18px; font-size: 15px; cursor: pointer; font-weight: 600; font-family: inherit; }
-  .btn:disabled { opacity: .45; cursor: not-allowed; }
-  .btn-sm { padding: 6px 12px; font-size: 13px; }
-  .btn-primary { background: #0b5ed7; color: #fff; }
-  .btn-success { background: #198754; color: #fff; }
-  .btn-danger  { background: #dc3545; color: #fff; }
-  .btn-secondary { background: #6c757d; color: #fff; }
-  .btn-warning { background: #fd7e14; color: #fff; }
-  .btn-info { background: #0dcaf0; color: #05323a; }
-  .btn-dark { background: #343a40; color: #fff; }
-
-  .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .btn-grid .btn {
-    margin: 0; width: 100%; padding: 14px 8px; font-size: 14px;
-    text-align: center; white-space: nowrap; overflow: hidden;
-    text-overflow: ellipsis; line-height: 1.2;
-  }
-  .btn-grid .btn.span-2 { grid-column: 1 / -1; }
-
-  #restoreBanner {
-    display: none; background: #d1e7dd; color: #0f5132;
-    border: 1px solid #a3cfbb; border-radius: 10px;
-    padding: 10px 12px; font-size: 13px; line-height: 1.6;
-    margin-bottom: 14px; align-items: center; gap: 8px; flex-wrap: wrap;
-  }
-  #restoreBanner .spacer { flex: 1; }
-
-  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-  .stat { background: #f0f4fa; border-radius: 10px; padding: 10px; text-align: center; }
-  .stat b { display: block; font-size: 22px; }
-
-  #readerWrap { display: none; margin-bottom: 14px; }
-  #reader { position: relative; width: 100%; max-width: 480px; margin: 0 auto; border-radius: 10px; overflow: hidden; background: #000; }
-  #reader video { width: 100%; display: block; background: #000; object-fit: cover; }
-  .scan-frame { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 82%; height: 40%; border: 2px solid rgba(255,80,80,.9); border-radius: 10px; box-shadow: 0 0 0 9999px rgba(0,0,0,.2); pointer-events: none; z-index: 10; }
-  .scan-frame::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 2px; background: rgba(255,80,80,.85); animation: scanline 2s ease-in-out infinite; }
-  @keyframes scanline { 0%,100% { top: 8%; } 50% { top: 92%; } }
-
-  .focus-ring {
-    position: absolute;
-    width: 80px; height: 80px;
-    margin-left: -40px; margin-top: -40px;
-    border: 2px solid #fff;
-    border-radius: 8px;
-    pointer-events: none;
-    z-index: 20;
-    display: none;
-    box-shadow: 0 0 0 1px rgba(0,0,0,.5), 0 0 12px rgba(255,255,255,.4);
-  }
-  .focus-ring.active {
-    display: block;
-    animation: focusPulse 0.9s ease-out;
-  }
-  @keyframes focusPulse {
-    0%   { transform: scale(1.5); opacity: 0; }
-    35%  { transform: scale(1);   opacity: 1; }
-    70%  { transform: scale(1);   opacity: 1; }
-    100% { transform: scale(1);   opacity: 0; }
-  }
-
-  #camStatus {
-    position: absolute;
-    top: 8px; left: 50%; transform: translateX(-50%);
-    background: rgba(0,0,0,.6); color: #fff;
-    padding: 3px 10px; border-radius: 10px;
-    font-size: 11px; white-space: nowrap;
-    z-index: 15; max-width: 92%;
-    overflow: hidden; text-overflow: ellipsis;
-    display: none;
-  }
-
-  #controlPanel {
-    position: absolute;
-    bottom: 10px; left: 50%; transform: translateX(-50%);
-    width: 90%; max-width: 440px;
-    z-index: 30;
-    display: none; flex-direction: column; gap: 8px;
-    background: rgba(0,0,0,0.6);
-    padding: 10px 16px; border-radius: 16px;
-    backdrop-filter: blur(4px);
-  }
-  .control-row { display: flex; align-items: center; gap: 10px; }
-  .control-row span { color: #fff; font-size: 12px; font-weight: bold; white-space: nowrap; min-width: 32px; }
-  .control-row input[type=range] {
-    flex: 1; -webkit-appearance: none; appearance: none; height: 4px; border-radius: 2px;
-    background: rgba(255,255,255,0.3); outline: none;
-  }
-  .control-row input[type=range]::-webkit-slider-thumb {
-    -webkit-appearance: none; appearance: none;
-    width: 20px; height: 20px; border-radius: 50%;
-    background: #0dcaf0; cursor: pointer; box-shadow: 0 0 4px rgba(0,0,0,.5);
-  }
-  #focusStepBtnGroup { display: none; gap: 8px; align-items: center; }
-  #focusStepBtnGroup button {
-    flex: 1; padding: 6px; font-size: 12px; font-weight: bold;
-    border: none; border-radius: 6px; background: #0dcaf0; color: #05323a;
-    cursor: pointer;
-  }
-  #focusStepBtnGroup button:active { background: #0bb5d6; }
-
-  #logCard { display: none; }
-  .log { max-height: 180px; overflow-y: auto; font-size: 13px; }
-  .log .ok { color: #198754; }
-  .log .dup { color: #fd7e14; }
-  .log .miss { color: #dc3545; }
-
-  table { border-collapse: collapse; font-size: 13px; width: max-content; min-width: 100%; }
-  th, td { border: 1px solid #e3e7ee; padding: 7px 8px; text-align: left; white-space: nowrap; }
-  th { background: #eef2f8; position: sticky; top: 0; z-index: 1; }
-  td.matched { background: #ffe3e3 !important; color: #b02a37; font-weight: 700; }
-  .table-wrap { max-height: 50vh; overflow: auto; border-radius: 8px; -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y; }
-  .hint { color: #666; font-size: 13px; line-height: 1.6; }
-  #fileName { font-size: 13px; color: #0b5ed7; margin-left: 6px; word-break: break-all; }
-  #uploadBusy { display: none; margin-left: 8px; font-size: 13px; color: #0b5ed7; }
-
-  .toast {
-    position: fixed; left: 50%; bottom: 60px; transform: translateX(-50%);
-    background: rgba(0,0,0,.88); color: #fff; padding: 14px 22px; border-radius: 18px;
-    font-size: 15px; display: none; z-index: 99; max-width: 90vw; text-align: center;
-    line-height: 1.6; word-break: break-word; box-shadow: 0 6px 20px rgba(0,0,0,.4);
-  }
-  .toast .head { font-size: 16px; font-weight: 700; }
-  .toast .info { display: block; font-size: 13px; font-weight: 400; color: #ffd75e; margin-top: 6px; }
-  #loadStatus { position: fixed; inset: 0; background: rgba(255,255,255,.92); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; z-index: 100; font-size: 15px; color: #333; }
-  .spinner { width: 36px; height: 36px; border: 4px solid #dbe4f0; border-top-color: #0b5ed7; border-radius: 50%; animation: spin 1s linear infinite; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  #loadRetry { display: none; }
-  #envWarn { display: none; background: #fff3cd; color: #7a5b00; border: 1px solid #ffe69c; border-radius: 10px; padding: 10px 12px; font-size: 13px; line-height: 1.6; margin-bottom: 14px; }
-  #envWarn b { color: #b02a37; }
-  #modalMask { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: none; align-items: center; justify-content: center; z-index: 200; padding: 18px; }
-  #modalMask.show { display: flex; }
-  #modal { background: #fff; border-radius: 14px; max-width: 420px; width: 100%; padding: 20px; box-shadow: 0 8px 30px rgba(0,0,0,.25); }
-  #modal h3 { margin: 0 0 10px; font-size: 16px; color: #b02a37; }
-  #modal .mbody { font-size: 14px; line-height: 1.7; color: #333; white-space: pre-wrap; word-break: break-word; }
-  #modal .mbody code { background: #f0f4fa; padding: 1px 5px; border-radius: 4px; font-size: 12px; word-break: break-all; }
-  #modal .mfoot { text-align: right; margin-top: 16px; }
-
-  #colPickerMask {
-    position: fixed; inset: 0; background: rgba(0,0,0,.5);
-    display: none; align-items: center; justify-content: center;
-    z-index: 300; padding: 18px;
-  }
-  #colPickerMask.show { display: flex; }
-  #colPicker {
-    background: #fff; border-radius: 14px; max-width: 480px; width: 100%;
-    padding: 20px; box-shadow: 0 8px 30px rgba(0,0,0,.25);
-    max-height: 82vh; display: flex; flex-direction: column;
-  }
-  #colPicker h3 { margin: 0 0 6px; font-size: 16px; color: #0b5ed7; }
-  .colPickerHint { font-size: 12px; color: #666; margin-bottom: 12px; }
-  #colPickerList { overflow-y: auto; flex: 1; -webkit-overflow-scrolling: touch; }
-  .colPickBtn {
-    display: block; width: 100%; text-align: left;
-    padding: 12px 14px; margin-bottom: 8px;
-    border: 2px solid #e3e7ee; border-radius: 10px;
-    background: #f8fafc; font-size: 14px; font-weight: 600;
-    cursor: pointer; color: #1a1a2e; font-family: inherit;
-  }
-  .colPickBtn:active { background: #e0ecff; border-color: #0b5ed7; }
-  .colPickBtn.current { border-color: #0b5ed7; background: #e0ecff; }
-  .colPickBtn .idx { color: #0b5ed7; margin-right: 8px; font-size: 12px; font-weight: 700; }
-  .colPickBtn.allBtn { background: #fff5e6; border-color: #ffd699; }
-  .colPickBtn.allBtn.current { border-color: #fd7e14; background: #ffe9cc; }
-  .colPickBtn.allBtn .idx { color: #fd7e14; }
-
-  /* ===== 语音识别面板 ===== */
-  #voiceMask {
-    position: fixed; inset: 0; background: rgba(0,0,0,.55);
-    display: none; align-items: center; justify-content: center;
-    z-index: 400; padding: 18px;
-  }
-  #voiceMask.show { display: flex; }
-  #voicePanel {
-    background: #fff; border-radius: 14px; max-width: 440px; width: 100%;
-    padding: 20px; box-shadow: 0 8px 30px rgba(0,0,0,.3);
-  }
-  #voicePanel h3 { margin: 0 0 8px; font-size: 16px; color: #0b5ed7; }
-  .voiceHint { font-size: 12px; color: #666; line-height: 1.6; margin-bottom: 12px; }
-  #voiceStatus { font-size: 13px; color: #0b5ed7; font-weight: 700; margin-bottom: 10px; text-align: center; padding: 8px; background: #eef6ff; border-radius: 8px; }
-  .voiceBlock { background: #f0f4fa; border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; min-height: 46px; }
-  .voiceBlock .label { font-size: 11px; color: #888; display: block; margin-bottom: 4px; font-weight: 600; }
-  .voiceBlock .content { font-size: 14px; color: #333; word-break: break-all; line-height: 1.5; }
-  .voiceBlock.norm { background: #e8f5e9; }
-  .voiceBlock.norm .content { font-size: 17px; color: #198754; font-weight: 800; letter-spacing: 1px; }
-  .voiceActions { display: flex; gap: 8px; margin-top: 14px; }
-  .voiceActions .btn { flex: 1; padding: 10px 6px; font-size: 13px; }
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;margin:0;background:#f4f6f9;color:#1a1a2e}
+header{background:#0b5ed7;color:#fff;padding:14px 16px;display:flex;align-items:center;gap:10px}
+header h1{font-size:18px;margin:0;flex:1}
+.badge{background:rgba(255,255,255,.2);border-radius:20px;padding:3px 10px;font-size:12px}
+main{max-width:960px;margin:0 auto;padding:14px}
+.card{background:#fff;border-radius:12px;padding:14px;margin-bottom:14px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.btn{display:inline-block;border:none;border-radius:10px;padding:12px 18px;font-size:15px;cursor:pointer;font-weight:600;font-family:inherit}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn-sm{padding:6px 12px;font-size:13px}
+.btn-primary{background:#0b5ed7;color:#fff}
+.btn-success{background:#198754;color:#fff}
+.btn-danger{background:#dc3545;color:#fff}
+.btn-secondary{background:#6c757d;color:#fff}
+.btn-warning{background:#fd7e14;color:#fff}
+.btn-info{background:#0dcaf0;color:#05323a}
+.btn-dark{background:#343a40;color:#fff}
+.btn-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btn-grid .btn{margin:0;width:100%;padding:14px 8px;font-size:14px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2}
+.btn-grid .btn.span-2{grid-column:1/-1}
+#restoreBanner{display:none;background:#d1e7dd;color:#0f5132;border:1px solid #a3cfbb;border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.6;margin-bottom:14px;align-items:center;gap:8px;flex-wrap:wrap}
+#restoreBanner .spacer{flex:1}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.stat{background:#f0f4fa;border-radius:10px;padding:10px;text-align:center}
+.stat b{display:block;font-size:22px}
+#readerWrap{display:none;margin-bottom:14px}
+#reader{position:relative;width:100%;max-width:480px;margin:0 auto;border-radius:10px;overflow:hidden;background:#000}
+#reader video{width:100%;display:block;background:#000;object-fit:cover}
+.scan-frame{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:82%;height:40%;border:2px solid rgba(255,80,80,.9);border-radius:10px;box-shadow:0 0 0 9999px rgba(0,0,0,.2);pointer-events:none;z-index:10}
+.scan-frame::after{content:"";position:absolute;left:0;right:0;top:50%;height:2px;background:rgba(255,80,80,.85);animation:scanline 2s ease-in-out infinite}
+@keyframes scanline{0%,100%{top:8%}50%{top:92%}}
+.focus-ring{position:absolute;width:80px;height:80px;margin-left:-40px;margin-top:-40px;border:2px solid #fff;border-radius:8px;pointer-events:none;z-index:20;display:none;box-shadow:0 0 0 1px rgba(0,0,0,.5),0 0 12px rgba(255,255,255,.4)}
+.focus-ring.active{display:block;animation:focusPulse .9s ease-out}
+@keyframes focusPulse{0%{transform:scale(1.5);opacity:0}35%{transform:scale(1);opacity:1}70%{transform:scale(1);opacity:1}100%{transform:scale(1);opacity:0}}
+#camStatus{position:absolute;top:8px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.6);color:#fff;padding:3px 10px;border-radius:10px;font-size:11px;white-space:nowrap;z-index:15;max-width:92%;overflow:hidden;text-overflow:ellipsis;display:none}
+#controlPanel{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);width:90%;max-width:440px;z-index:30;display:none;flex-direction:column;gap:8px;background:rgba(0,0,0,.6);padding:10px 16px;border-radius:16px;backdrop-filter:blur(4px)}
+.control-row{display:flex;align-items:center;gap:10px}
+.control-row span{color:#fff;font-size:12px;font-weight:bold;white-space:nowrap;min-width:32px}
+.control-row input[type=range]{flex:1;-webkit-appearance:none;appearance:none;height:4px;border-radius:2px;background:rgba(255,255,255,.3);outline:none}
+.control-row input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:20px;height:20px;border-radius:50%;background:#0dcaf0;cursor:pointer;box-shadow:0 0 4px rgba(0,0,0,.5)}
+#focusStepBtnGroup{display:none;gap:8px;align-items:center}
+#focusStepBtnGroup button{flex:1;padding:6px;font-size:12px;font-weight:bold;border:none;border-radius:6px;background:#0dcaf0;color:#05323a;cursor:pointer}
+#focusStepBtnGroup button:active{background:#0bb5d6}
+#logCard{display:none}
+.log{max-height:180px;overflow-y:auto;font-size:13px}
+.log .ok{color:#198754}
+.log .dup{color:#fd7e14}
+.log .miss{color:#dc3545}
+table{border-collapse:collapse;font-size:13px;width:max-content;min-width:100%}
+th,td{border:1px solid #e3e7ee;padding:7px 8px;text-align:left;white-space:nowrap}
+th{background:#eef2f8;position:sticky;top:0;z-index:1}
+td.matched{background:#ffe3e3 !important;color:#b02a37;font-weight:700}
+.table-wrap{max-height:50vh;overflow:auto;border-radius:8px;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y}
+.hint{color:#666;font-size:13px;line-height:1.6}
+#fileName{font-size:13px;color:#0b5ed7;margin-left:6px;word-break:break-all}
+#uploadBusy{display:none;margin-left:8px;font-size:13px;color:#0b5ed7}
+.toast{position:fixed;left:50%;bottom:60px;transform:translateX(-50%);background:rgba(0,0,0,.88);color:#fff;padding:14px 22px;border-radius:18px;font-size:15px;display:none;z-index:99;max-width:90vw;text-align:center;line-height:1.6;word-break:break-word;box-shadow:0 6px 20px rgba(0,0,0,.4)}
+.toast .head{font-size:16px;font-weight:700}
+.toast .info{display:block;font-size:13px;font-weight:400;color:#ffd75e;margin-top:6px}
+#loadStatus{position:fixed;inset:0;background:rgba(255,255,255,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:100;font-size:15px;color:#333}
+.spinner{width:36px;height:36px;border:4px solid #dbe4f0;border-top-color:#0b5ed7;border-radius:50%;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+#loadRetry{display:none}
+#modalMask{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;z-index:200;padding:18px}
+#modalMask.show{display:flex}
+#modal{background:#fff;border-radius:14px;max-width:420px;width:100%;padding:20px;box-shadow:0 8px 30px rgba(0,0,0,.25)}
+#modal h3{margin:0 0 10px;font-size:16px;color:#b02a37}
+#modal .mbody{font-size:14px;line-height:1.7;color:#333;white-space:pre-wrap;word-break:break-word}
+#modal .mfoot{text-align:right;margin-top:16px}
+#colPickerMask{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:300;padding:18px}
+#colPickerMask.show{display:flex}
+#colPicker{background:#fff;border-radius:14px;max-width:480px;width:100%;padding:20px;box-shadow:0 8px 30px rgba(0,0,0,.25);max-height:82vh;display:flex;flex-direction:column}
+#colPicker h3{margin:0 0 6px;font-size:16px;color:#0b5ed7}
+.colPickerHint{font-size:12px;color:#666;margin-bottom:12px}
+#colPickerList{overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch}
+.colPickBtn{display:block;width:100%;text-align:left;padding:12px 14px;margin-bottom:8px;border:2px solid #e3e7ee;border-radius:10px;background:#f8fafc;font-size:14px;font-weight:600;cursor:pointer;color:#1a1a2e;font-family:inherit}
+.colPickBtn:active{background:#e0ecff;border-color:#0b5ed7}
+.colPickBtn.current{border-color:#0b5ed7;background:#e0ecff}
+.colPickBtn .idx{color:#0b5ed7;margin-right:8px;font-size:12px;font-weight:700}
+.colPickBtn.allBtn{background:#fff5e6;border-color:#ffd699}
+.colPickBtn.allBtn.current{border-color:#fd7e14;background:#ffe9cc}
+.colPickBtn.allBtn .idx{color:#fd7e14}
+#voiceMask{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;z-index:400;padding:18px}
+#voiceMask.show{display:flex}
+#voicePanel{background:#fff;border-radius:14px;max-width:440px;width:100%;padding:20px;box-shadow:0 8px 30px rgba(0,0,0,.3)}
+#voicePanel h3{margin:0 0 8px;font-size:16px;color:#0b5ed7}
+.voiceHint{font-size:12px;color:#666;line-height:1.6;margin-bottom:12px}
+#voiceStatus{font-size:13px;color:#0b5ed7;font-weight:700;margin-bottom:10px;text-align:center;padding:8px;background:#eef6ff;border-radius:8px}
+.voiceBlock{background:#f0f4fa;border-radius:8px;padding:10px 12px;margin-bottom:8px;min-height:46px}
+.voiceBlock .label{font-size:11px;color:#888;display:block;margin-bottom:4px;font-weight:600}
+.voiceBlock .content{font-size:14px;color:#333;word-break:break-all;line-height:1.5}
+.voiceBlock.norm{background:#e8f5e9}
+.voiceBlock.norm .content{font-size:17px;color:#198754;font-weight:800;letter-spacing:1px}
+.voiceActions{display:flex;gap:8px;margin-top:14px}
+.voiceActions .btn{flex:1;padding:10px 6px;font-size:13px}
+#fuzzyMask{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:500;padding:18px}
+#fuzzyMask.show{display:flex}
+#fuzzyPanel{background:#fff;border-radius:14px;max-width:480px;width:100%;padding:20px;box-shadow:0 8px 30px rgba(0,0,0,.35);max-height:88vh;display:flex;flex-direction:column}
+#fuzzyPanel h3{margin:0 0 8px;font-size:16px;color:#0b5ed7}
+.fuzzyHint{font-size:12px;color:#666;line-height:1.7;margin-bottom:10px}
+.fuzzyHint strong{color:#0b5ed7}
+#fuzzyInput{font-family:monospace;background:#eef6ff;padding:2px 6px;border-radius:4px;color:#b02a37;font-weight:700;word-break:break-all}
+#fuzzyList{overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch;margin-bottom:10px}
+.fuzzyItem{display:block;width:100%;text-align:left;padding:12px 14px;margin-bottom:8px;border:2px solid #e3e7ee;border-radius:10px;background:#f8fafc;cursor:pointer;font-family:inherit}
+.fuzzyItem.selected{border-color:#0b5ed7;background:#e0ecff}
+.fuzzyItemText{font-size:16px;font-weight:700;color:#1a1a2e;word-break:break-all;margin-bottom:4px;font-family:monospace}
+.fuzzyItemMeta{font-size:11px;color:#666}
+.fuzzyItemMeta .score-high{color:#198754;font-weight:700}
+.fuzzyItemMeta .score-mid{color:#fd7e14;font-weight:700}
+#fuzzyEmpty{padding:20px;text-align:center;color:#b02a37;background:#ffe3e3;border-radius:8px;font-size:13px;line-height:1.7;margin-bottom:10px}
+.fuzzyActions{display:flex;gap:8px}
+.fuzzyActions .btn{flex:1;padding:11px 6px;font-size:13px}
 </style>
 </head>
 <body>
 <div id="loadStatus">
-  <div class="spinner"></div>
-  <div id="loadText">正在加载组件，请稍候…</div>
-  <button class="btn btn-primary" id="loadRetry" onclick="location.reload()">加载失败，点击重试</button>
+<div class="spinner"></div>
+<div id="loadText">正在加载组件，请稍候…</div>
+<button class="btn btn-primary" id="loadRetry" onclick="location.reload()">加载失败，点击重试</button>
 </div>
 
 <header>
-  <h1>📦 飞利浦收货核对</h1>
-  <span class="badge" id="colBadge" style="display:none"></span>
+<h1>📦 飞利浦收货核对</h1>
+<span class="badge" id="colBadge" style="display:none"></span>
 </header>
 
 <main>
-  <div id="envWarn"></div>
+<div id="restoreBanner">
+<span id="restoreText">💾 已恢复上次核对进度</span>
+<span class="spacer"></span>
+<button class="btn btn-sm btn-danger" id="btnClearStorage">清除保存的数据</button>
+</div>
 
-  <div id="restoreBanner">
-    <span id="restoreText">💾 已恢复上次核对进度</span>
-    <span class="spacer"></span>
-    <button class="btn btn-sm btn-danger" id="btnClearStorage">清除保存的数据</button>
-  </div>
+<div class="card">
+<div class="btn-grid">
+<button class="btn btn-primary" id="btnUpload" disabled>上传Excel</button>
+<button class="btn btn-dark need-data" id="btnExportLog" style="display:none">运行日志</button>
+<button class="btn btn-secondary need-data" id="btnChangeCol" style="display:none">切换核对模式</button>
+<button class="btn btn-warning need-data" id="btnLocate" style="display:none">📍 定位最后核对项</button>
+<button class="btn btn-info need-data" id="btnExport" style="display:none">分享全部数据</button>
+<button class="btn btn-info need-data" id="btnExportMatched" style="display:none">分享已扫描数据</button>
+<button class="btn btn-dark need-data span-2" id="btnVoice" style="display:none">🎤 语音识别条码</button>
+<button class="btn btn-success need-data span-2" id="btnCamera" style="display:none">开始扫描</button>
+<button class="btn btn-danger span-2" id="btnStop" style="display:none">停止扫描</button>
+</div>
+<div style="margin-top:10px;min-height:18px">
+<span id="fileName"></span>
+<span id="uploadBusy">⏳ 正在解析表格…</span>
+</div>
+</div>
 
-  <div class="card">
-    <div class="btn-grid">
-      <button class="btn btn-primary" id="btnUpload" disabled>上传Excel</button>
-      <button class="btn btn-dark need-data" id="btnExportLog" style="display:none">运行日志</button>
+<div id="readerWrap">
+<div id="reader">
+<div id="camStatus"></div>
+<div class="focus-ring" id="focusRing"></div>
+<div id="controlPanel">
+<div class="control-row" id="zoomRow" style="display:none"><span>变焦</span><input type="range" id="zoomSlider" min="1" max="8" step="0.1" value="1"></div>
+<div class="control-row" id="focusDistanceRow" style="display:none"><span>对焦</span><input type="range" id="focusDistanceSlider" min="0" max="1" step="0.01" value="0.5"></div>
+<div class="control-row" id="focusStepRow" style="display:none"><span>微调</span><div id="focusStepBtnGroup"><button id="btnFocusMinus">- 对焦</button><button id="btnFocusPlus">+ 对焦</button></div></div>
+</div>
+</div>
+<div id="camTip" style="max-width:480px;margin:6px auto 0;text-align:center;font-size:12px;color:#666;display:none">💡 画面模糊时，点击画面任意位置可尝试对焦，底部控制面板可手动微调</div>
+</div>
 
-      <button class="btn btn-secondary need-data" id="btnChangeCol" style="display:none">切换核对模式</button>
-      <button class="btn btn-warning need-data" id="btnLocate" style="display:none">📍 定位最后核对项</button>
+<div class="card" id="statCard" style="display:none">
+<div class="stats">
+<div class="stat">总数<b id="stTotal">0</b></div>
+<div class="stat" style="color:#198754">已核对<b id="stDone">0</b></div>
+<div class="stat" style="color:#dc3545">未核对<b id="stLeft">0</b></div>
+</div>
+</div>
 
-      <button class="btn btn-info need-data" id="btnExport" style="display:none">分享全部数据</button>
-      <button class="btn btn-info need-data" id="btnExportMatched" style="display:none">分享已扫描数据</button>
+<div class="card" id="logCard"><div class="log" id="log"></div></div>
 
-      <button class="btn btn-dark need-data span-2" id="btnVoice" style="display:none">🎤 语音识别条码</button>
-      <button class="btn btn-success need-data span-2" id="btnCamera" style="display:none">开始扫描</button>
-      <button class="btn btn-danger span-2" id="btnStop" style="display:none">停止扫描</button>
-    </div>
-    <div style="margin-top:10px; min-height:18px;">
-      <span id="fileName"></span>
-      <span id="uploadBusy">⏳ 正在解析表格…</span>
-    </div>
-  </div>
-
-  <div id="readerWrap">
-    <div id="reader">
-      <div id="camStatus"></div>
-      <div class="focus-ring" id="focusRing"></div>
-      <div id="controlPanel">
-        <div class="control-row" id="zoomRow" style="display:none;">
-          <span>变焦</span>
-          <input type="range" id="zoomSlider" min="1" max="8" step="0.1" value="1">
-        </div>
-        <div class="control-row" id="focusDistanceRow" style="display:none;">
-          <span>对焦</span>
-          <input type="range" id="focusDistanceSlider" min="0" max="1" step="0.01" value="0.5">
-        </div>
-        <div class="control-row" id="focusStepRow" style="display:none;">
-          <span>微调</span>
-          <div id="focusStepBtnGroup">
-            <button id="btnFocusMinus">- 对焦</button>
-            <button id="btnFocusPlus">+ 对焦</button>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div id="camTip" style="max-width:480px; margin:6px auto 0; text-align:center; font-size:12px; color:#666; display:none;">
-      💡 画面模糊时，点击画面任意位置可尝试对焦，底部控制面板可手动微调
-    </div>
-  </div>
-
-  <div class="card" id="statCard" style="display:none">
-    <div class="stats">
-      <div class="stat">总数<b id="stTotal">0</b></div>
-      <div class="stat" style="color:#198754">已核对<b id="stDone">0</b></div>
-      <div class="stat" style="color:#dc3545">未核对<b id="stLeft">0</b></div>
-    </div>
-  </div>
-
-  <div class="card" id="logCard">
-    <div class="log" id="log"></div>
-  </div>
-
-  <div class="card" id="tableCard" style="display:none">
-    <div class="table-wrap"><table id="grid"></table></div>
-    <span id="exportName" class="hint"></span>
-  </div>
+<div class="card" id="tableCard" style="display:none">
+<div class="table-wrap"><table id="grid"></table></div>
+<span id="exportName" class="hint"></span>
+</div>
 </main>
 
 <div class="toast" id="toast"></div>
 
-<div id="modalMask">
-  <div id="modal">
-    <h3 id="modalTitle">提示</h3>
-    <div class="mbody" id="modalBody"></div>
-    <div class="mfoot"><button class="btn btn-primary" id="modalOk">知道了</button></div>
-  </div>
-</div>
+<div id="modalMask"><div id="modal"><h3 id="modalTitle">提示</h3><div class="mbody" id="modalBody"></div><div class="mfoot"><button class="btn btn-primary" id="modalOk">知道了</button></div></div></div>
 
-<div id="colPickerMask">
-  <div id="colPicker">
-    <h3>请选择核对模式</h3>
-    <div class="colPickerHint">「全部列」会对整张表格所有单元格进行核对；选择具体列则仅核对那一列</div>
-    <div id="colPickerList"></div>
-  </div>
-</div>
+<div id="colPickerMask"><div id="colPicker"><h3>请选择核对模式</h3><div class="colPickerHint">「全部列」会对整张表格所有单元格进行核对；选择具体列则仅核对那一列</div><div id="colPickerList"></div></div></div>
 
 <div id="voiceMask">
-  <div id="voicePanel">
-    <h3>🎤 语音识别条码</h3>
-    <div class="voiceHint">请清晰读出条码内容（字母、数字可逐个读）。<strong>中间停顿不影响</strong>，说完稍等 1.5 秒会自动结束。</div>
-    <div id="voiceStatus">准备中…</div>
-    <div class="voiceBlock">
-      <span class="label">识别到的原文</span>
-      <div class="content" id="voiceRawText">（等待语音…）</div>
-    </div>
-    <div class="voiceBlock norm">
-      <span class="label" style="color:#198754">归一化后（将用于核对）</span>
-      <div class="content" id="voiceNormalizedText">—</div>
-    </div>
-    <div class="voiceActions">
-      <button class="btn btn-secondary" id="voiceCancelBtn">取消</button>
-      <button class="btn btn-warning" id="voiceRetryBtn">重说</button>
-      <button class="btn btn-primary" id="voiceConfirmBtn" disabled>确认提交</button>
-    </div>
-  </div>
+<div id="voicePanel">
+<h3>🎤 语音识别条码</h3>
+<div class="voiceHint">
+📌 摄像头扫码：完全匹配（一字不差）<br>
+📌 语音识别：<strong>可以只读数字进行搜索匹配</strong><br>
+💡 阿拉伯数字或中文数字均可，中间停顿不影响，说完等 1.5 秒自动结束
+</div>
+<div id="voiceStatus">准备中…</div>
+<div class="voiceBlock"><span class="label">识别到的原文</span><div class="content" id="voiceRawText">（等待语音…）</div></div>
+<div class="voiceBlock norm"><span class="label" style="color:#198754">用于比对（中文数字已转阿拉伯）</span><div class="content" id="voiceNormalizedText">—</div></div>
+<div class="voiceActions">
+<button class="btn btn-secondary" id="voiceCancelBtn">取消</button>
+<button class="btn btn-warning" id="voiceRetryBtn">重说</button>
+<button class="btn btn-primary" id="voiceConfirmBtn" disabled>查找匹配</button>
+</div>
+</div>
+</div>
+
+<div id="fuzzyMask">
+<div id="fuzzyPanel">
+<h3>🔍 模糊匹配结果</h3>
+<div class="fuzzyHint">你读出的内容：<span id="fuzzyInput">—</span><br>以下是表格中<strong>最相似</strong>的单元格，请点击选择要核对的那一个：</div>
+<div id="fuzzyList"></div>
+<div id="fuzzyEmpty" style="display:none">❌ 没有找到相似的单元格<br>请点「重新识别」再读一次，或点「取消」</div>
+<div class="fuzzyActions">
+<button class="btn btn-secondary" id="fuzzyCancelBtn">取消</button>
+<button class="btn btn-warning" id="fuzzyRetryBtn">重新识别</button>
+<button class="btn btn-primary" id="fuzzyConfirmBtn">确定核对</button>
+</div>
+</div>
 </div>
 
 <script>
-/* ===== 多 CDN 容错加载 ===== */
-var LIBS = {
-  XLSX: [
-    "https://cdn.bootcdn.net/ajax/libs/xlsx/0.18.5/xlsx.full.min.js",
-    "https://cdn.staticfile.org/xlsx/0.18.5/xlsx.full.min.js",
-    "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js",
-    "https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"
-  ],
-  ExcelJS: [
-    "https://cdn.bootcdn.net/ajax/libs/exceljs/4.4.0/exceljs.min.js",
-    "https://cdn.staticfile.org/exceljs/4.4.0/exceljs.min.js",
-    "https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js",
-    "https://unpkg.com/exceljs@4.4.0/dist/exceljs.min.js"
-  ],
-  Html5Qrcode: [
-    "https://cdn.bootcdn.net/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js",
-    "https://cdn.staticfile.org/html5-qrcode/2.3.8/html5-qrcode.min.js",
-    "https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js",
-    "https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"
-  ]
-};
-function loadOne(urls, i, ok, fail){
-  if(i >= urls.length){ fail(); return; }
-  var s = document.createElement("script");
-  s.src = urls[i];
-  s.async = true;
-  s.onload = ok;
-  s.onerror = function(){ loadOne(urls, i+1, ok, fail); };
-  document.head.appendChild(s);
-}
-loadOne(LIBS.XLSX, 0, function(){
-  document.getElementById("loadStatus").style.display = "none";
-  document.getElementById("btnUpload").disabled = false;
-  loadOne(LIBS.ExcelJS, 0, function(){}, function(){});
-  loadOne(LIBS.Html5Qrcode, 0, function(){}, function(){});
-}, function(){
-  document.getElementById("loadText").textContent = "表格组件加载失败，请检查网络后重试";
-  document.getElementById("loadText").style.color = "#dc3545";
-  document.getElementById("loadRetry").style.display = "inline-block";
-  document.querySelector(".spinner").style.display = "none";
-});
+var LIBS={XLSX:["https://cdn.bootcdn.net/ajax/libs/xlsx/0.18.5/xlsx.full.min.js","https://cdn.staticfile.org/xlsx/0.18.5/xlsx.full.min.js","https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js","https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"],ExcelJS:["https://cdn.bootcdn.net/ajax/libs/exceljs/4.4.0/exceljs.min.js","https://cdn.staticfile.org/exceljs/4.4.0/exceljs.min.js","https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js","https://unpkg.com/exceljs@4.4.0/dist/exceljs.min.js"],Html5Qrcode:["https://cdn.bootcdn.net/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js","https://cdn.staticfile.org/html5-qrcode/2.3.8/html5-qrcode.min.js","https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js","https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"]};
+function loadOne(u,i,ok,fail){if(i>=u.length){fail();return}var s=document.createElement("script");s.src=u[i];s.async=true;s.onload=ok;s.onerror=function(){loadOne(u,i+1,ok,fail)};document.head.appendChild(s)}
+loadOne(LIBS.XLSX,0,function(){document.getElementById("loadStatus").style.display="none";document.getElementById("btnUpload").disabled=false;loadOne(LIBS.ExcelJS,0,function(){},function(){});loadOne(LIBS.Html5Qrcode,0,function(){},function(){})},function(){document.getElementById("loadText").textContent="表格组件加载失败，请检查网络后重试";document.getElementById("loadText").style.color="#dc3545";document.getElementById("loadRetry").style.display="inline-block";document.querySelector(".spinner").style.display="none"});
 </script>
 
 <script>
-let sheetName = "", headers = [], rows = [];
-let matchColIdx = null;
-let matchedSet = new Set();
-let matchedCells = new Set();
-let codeIndex = new Map();
-let fileBase = "核对结果";
-let lastHitRow = -1;
-let hasSavedData = false;
-let checkLog = [];
-const $ = id => document.getElementById(id);
-
-/* ===== 平台检测 ===== */
-const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-               (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-console.log("[平台] iOS:", IS_IOS);
-
-function showDataButtons(show) {
-  document.querySelectorAll(".need-data").forEach(el => {
-    el.style.display = show ? "" : "none";
-  });
-}
-
-/* =========================================================
-   IndexedDB
-   ========================================================= */
-const DB_NAME = 'philips_check_db';
-const DB_VERSION = 1;
-const DB_STORE = 'table_data';
-const KEY_MATCHED_CELLS = 'philips_check_matched_cells_v1';
-const KEY_MATCHED_OLD   = 'philips_check_matched_v1';
-
-let _dbPromise = null;
-function openDB() {
-  if (_dbPromise) return _dbPromise;
-  _dbPromise = new Promise((resolve, reject) => {
-    if (!window.indexedDB) { reject(new Error("IndexedDB 不可用")); return; }
-    const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = () => {
-      const db = req.result;
-      if (!db.objectStoreNames.contains(DB_STORE)) db.createObjectStore(DB_STORE);
-    };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-  return _dbPromise;
-}
-function dbPut(key, value) {
-  return openDB().then(db => new Promise((resolve, reject) => {
-    const tx = db.transaction(DB_STORE, 'readwrite');
-    tx.objectStore(DB_STORE).put(value, key);
-    tx.oncomplete = () => resolve(true);
-    tx.onerror = () => reject(tx.error);
-  })).catch(e => { console.warn("dbPut失败", key, e); return false; });
-}
-function dbGet(key) {
-  return openDB().then(db => new Promise((resolve, reject) => {
-    const tx = db.transaction(DB_STORE, 'readonly');
-    const req = tx.objectStore(DB_STORE).get(key);
-    req.onsuccess = () => resolve(req.result === undefined ? null : req.result);
-    req.onerror = () => reject(req.error);
-  })).catch(e => { console.warn("dbGet失败", key, e); return null; });
-}
-function dbDelete(key) {
-  return openDB().then(db => new Promise((resolve, reject) => {
-    const tx = db.transaction(DB_STORE, 'readwrite');
-    tx.objectStore(DB_STORE).delete(key);
-    tx.oncomplete = () => resolve(true);
-    tx.onerror = () => reject(tx.error);
-  })).catch(e => false);
-}
-
-function saveTableData(data) { return dbPut('main', data); }
-function loadTableData() { return dbGet('main'); }
-function deleteTableData() { return dbDelete('main'); }
-function saveLogToDB() { return dbPut('log', checkLog.slice(-5000)); }
-function loadLogFromDB() { return dbGet('log').then(v => Array.isArray(v) ? v : []); }
-function deleteLogFromDB() { return dbDelete('log'); }
-
-/* ===== 单元格级进度保存 ===== */
-function saveMatched() {
-  try {
-    localStorage.setItem(KEY_MATCHED_CELLS, JSON.stringify(Array.from(matchedCells)));
-  } catch(e) {}
-}
-function loadMatchedCells() {
-  try {
-    const s = localStorage.getItem(KEY_MATCHED_CELLS);
-    return s ? JSON.parse(s) : [];
-  } catch(e) { return []; }
-}
-function clearMatched() {
-  try {
-    localStorage.removeItem(KEY_MATCHED_CELLS);
-    localStorage.removeItem(KEY_MATCHED_OLD);
-  } catch(e) {}
-}
-
-function rebuildMatchedSetFromCells() {
-  matchedSet = new Set();
-  matchedCells.forEach(k => {
-    const r = parseInt(String(k).split("-")[0], 10);
-    if (!isNaN(r)) matchedSet.add(r);
-  });
-  lastHitRow = matchedSet.size ? Math.max.apply(null, Array.from(matchedSet)) : -1;
-}
-
-/* =========================================================
-   振动反馈
-   ========================================================= */
-function vibrate(type) {
-  if (!navigator.vibrate) return;
-  try {
-    if (type === 'ok') navigator.vibrate(60);
-    else if (type === 'dup') navigator.vibrate([80, 60, 80]);
-    else if (type === 'miss') navigator.vibrate([300, 100, 300, 100, 300]);
-  } catch(e) {}
-}
-
-/* =========================================================
-   音频
-   ========================================================= */
-let audioCtx = null;
-function ensureCtx() {
-  if (!audioCtx) {
-    const AC = window.AudioContext || window.webkitAudioContext;
-    if (AC) audioCtx = new AC();
-  }
-  return audioCtx;
-}
-function playTone(ctx, freq, durationMs, volume, startTime) {
-  try {
-    const o = ctx.createOscillator();
-    const g = ctx.createGain();
-    o.type = 'sine';
-    o.frequency.value = freq;
-    o.connect(g); g.connect(ctx.destination);
-    const v = Math.min(volume, 1.0);
-    g.gain.setValueAtTime(v, startTime);
-    g.gain.exponentialRampToValueAtTime(0.001, startTime + durationMs / 1000);
-    o.start(startTime);
-    o.stop(startTime + durationMs / 1000);
-  } catch(e) {}
-}
-function initAudioAndUnlock() {
-  const ctx = ensureCtx();
-  if (!ctx) return;
-  const fire = () => { playTone(ctx, 1500, 130, 1.0, ctx.currentTime); };
-  if (ctx.state === 'suspended') { ctx.resume().then(fire).catch(fire); }
-  else { fire(); }
-}
-function playBeep(type) {
-  const ctx = ensureCtx();
-  if (!ctx) return;
-  const fire = () => {
-    const now = ctx.currentTime;
-    if (type === 'ok') {
-      playTone(ctx, 1500, 120, 1.0, now);
-      playTone(ctx, 2000, 130, 1.0, now + 0.14);
-    } else if (type === 'dup') {
-      playTone(ctx, 1000, 60, 1.0, now);
-      playTone(ctx, 1000, 60, 1.0, now + 0.1);
-      playTone(ctx, 1000, 60, 1.0, now + 0.2);
-    } else if (type === 'miss') {
-      playTone(ctx, 400, 500, 1.0, now);
-    }
-  };
-  if (ctx.state === 'suspended') { ctx.resume().then(fire).catch(fire); }
-  else { fire(); }
-}
-function speak(text){
-  try{
-    if (!window.speechSynthesis) return;
-    speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = "zh-CN"; u.rate = 1.15; u.volume = 1;
-    speechSynthesis.speak(u);
-  }catch(e){}
-}
-
-/* ===== UI ===== */
-function toast(head, info, ms){
-  const t = $("toast");
-  let html = '<div class="head">' + head + '</div>';
-  if (info) html += '<span class="info">' + info + '</span>';
-  t.innerHTML = html;
-  t.style.display = "block";
-  clearTimeout(t._tm);
-  t._tm = setTimeout(()=> t.style.display = "none", ms || 2600);
-}
-function logMsg(cls, msg){
-  const d = document.createElement("div");
-  d.className = cls;
-  d.textContent = msg;
-  $("log").prepend(d);
-  $("logCard").style.display = "block";
-}
-function popup(title, bodyHtml){
-  $("modalTitle").textContent = title;
-  $("modalBody").innerHTML = bodyHtml;
-  $("modalMask").classList.add("show");
-}
-$("modalOk").onclick = () => $("modalMask").classList.remove("show");
-$("modalMask").onclick = e => { if(e.target === $("modalMask")) $("modalMask").classList.remove("show"); };
-
-function hasGetUserMedia(){
-  return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
-}
-function esc(s){
-  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-}
-
-function modeText(idx) {
-  if (idx === -1) return "全部列（核对整表所有单元格）";
-  if (idx === null || idx === undefined) return "";
-  return headers[idx] || ("第" + (idx + 1) + "列");
-}
-
-/* ===== 列选择 ===== */
-function pickColumn(currentIdx, callback) {
-  const mask = $("colPickerMask");
-  const list = $("colPickerList");
-  list.innerHTML = "";
-
-  const allBtn = document.createElement("button");
-  allBtn.className = "colPickBtn allBtn" + (currentIdx === -1 ? " current" : "");
-  allBtn.innerHTML = '<span class="idx">ALL</span>全部列（核对整表所有单元格）';
-  allBtn.onclick = () => {
-    mask.classList.remove("show");
-    callback(-1);
-  };
-  list.appendChild(allBtn);
-
-  headers.forEach((h, i) => {
-    const btn = document.createElement("button");
-    btn.className = "colPickBtn" + (i === currentIdx ? " current" : "");
-    btn.innerHTML = '<span class="idx">第' + (i + 1) + '列</span>' + esc(h || "(空标题)");
-    btn.onclick = () => {
-      mask.classList.remove("show");
-      callback(i);
-    };
-    list.appendChild(btn);
-  });
-  mask.classList.add("show");
-}
-
-/* ===== 上传 ===== */
-$("btnUpload").onclick = () => {
-  if (hasSavedData) {
-    if (!confirm("检测到上次保存的核对数据。\n\n上传新表格会覆盖旧数据，是否继续？\n\n（如果想保留旧数据，点取消）")) return;
-  }
-  pickFile();
-};
-
-function pickFile() {
-  const inp = document.createElement("input");
-  inp.type = "file";
-  inp.accept = ".xlsx,.xls,.csv";
-  inp.onchange = async e => {
-    const f = e.target.files[0];
-    if (!f) return;
-    $("fileName").textContent = f.name;
-    fileBase = f.name.replace(/\.[^.]+$/, "");
-    $("uploadBusy").style.display = "inline";
-    $("btnUpload").disabled = true;
-
-    try {
-      if (typeof XLSX === "undefined") throw new Error("XLSX 组件未加载，请检查网络后重试");
-
-      const buf = await f.arrayBuffer();
-      const wb = XLSX.read(buf, { type: "array" });
-      sheetName = wb.SheetNames[0];
-      const ws = wb.Sheets[sheetName];
-      const arr = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "", raw: true });
-      if (!arr.length) { toast("提示", "表格为空"); return; }
-
-      headers = arr[0].map(h => String(h).trim());
-      rows = arr.slice(1).filter(r => r.some(c => String(c).trim() !== ""));
-      if (!headers.length) { toast("提示", "表格没有表头"); return; }
-
-      $("uploadBusy").style.display = "none";
-      $("btnUpload").disabled = false;
-
-      pickColumn(null, function(idx) {
-        matchColIdx = idx;
-        $("colBadge").style.display = "inline";
-        $("colBadge").textContent = "核对模式：" + modeText(idx);
-
-        matchedSet = new Set();
-        matchedCells = new Set();
-        lastHitRow = -1;
-        clearMatched();
-        buildIndex();
-        renderTable(); updateStats();
-
-        $("restoreBanner").style.display = "none";
-        showDataButtons(true);
-        $("statCard").style.display = "block";
-        $("tableCard").style.display = "block";
-        $("btnCamera").style.display = "";
-        $("btnStop").style.display = "none";
-
-        toast("已读取 " + rows.length + " 行数据", "正在后台保存进度…");
-
-        saveTableData({
-          headers: headers, rows: rows, matchColIdx: matchColIdx,
-          sheetName: sheetName, fileBase: fileBase, savedAt: Date.now()
-        }).then(ok => {
-          hasSavedData = ok;
-          if (ok) toast("核对模式：" + modeText(idx), "✅ 进度已保存，可放心关闭");
-          else    toast("核对模式：" + modeText(idx), "⚠️ 进度保存失败，请勿关闭页面");
-        });
-      });
-
-    } catch (err) {
-      console.error(err);
-      toast("读取失败", String(err && err.message || err));
-      $("uploadBusy").style.display = "none";
-      $("btnUpload").disabled = false;
-    }
-  };
-  inp.click();
-}
-
-/* ===== 切换核对模式 ===== */
-$("btnChangeCol").onclick = () => {
-  if (!headers.length) return;
-  pickColumn(matchColIdx, function(idx) {
-    matchColIdx = idx;
-    $("colBadge").style.display = "inline";
-    $("colBadge").textContent = "核对模式：" + modeText(idx);
-
-    buildIndex();
-    renderTable(); updateStats();
-
-    saveTableData({
-      headers: headers, rows: rows, matchColIdx: matchColIdx,
-      sheetName: sheetName, fileBase: fileBase, savedAt: Date.now()
-    });
-    toast("已切换核对模式", modeText(idx));
-  });
-};
-
-/* ===== 建立索引 ===== */
-function buildIndex(){
-  codeIndex = new Map();
-  if (matchColIdx === null || matchColIdx === undefined) return;
-
-  if (matchColIdx === -1) {
-    rows.forEach((r, i) => {
-      r.forEach((val, j) => {
-        const k = String(val ?? "").trim();
-        if (!k) return;
-        if (!codeIndex.has(k)) codeIndex.set(k, []);
-        codeIndex.get(k).push({ r: i, c: j });
-      });
-    });
-  } else {
-    rows.forEach((r, i) => {
-      const k = String(r[matchColIdx] ?? "").trim();
-      if (!k) return;
-      if (!codeIndex.has(k)) codeIndex.set(k, []);
-      codeIndex.get(k).push({ r: i, c: matchColIdx });
-    });
-  }
-}
-
-/* ===== 渲染表格 ===== */
-function renderTable(){
-  let html = "<tr>" + headers.map(h=>"<th>"+esc(h)+"</th>").join("") + "</tr>";
-  rows.forEach((r,i)=>{
-    html += "<tr data-i='"+i+"'>";
-    headers.forEach((_,j)=>{
-      const isMatched = matchedCells.has(i + "-" + j);
-      html += "<td" + (isMatched ? " class='matched'" : "") + ">" + esc(String(r[j]??"")) + "</td>";
-    });
-    html += "</tr>";
-  });
-  $("grid").innerHTML = html;
-}
-
-function updateStats(){
-  $("statCard").style.display = "block";
-  $("stTotal").textContent = rows.length;
-  $("stDone").textContent = matchedSet.size;
-  $("stLeft").textContent = rows.length - matchedSet.size;
-}
-
-function getRowInfo(rowIndex) {
-  const rowData = rows[rowIndex] || [];
-  const parts = [];
-  rowData.forEach((val, idx) => {
-    const s = String(val).trim();
-    if (s) {
-      const h = headers[idx] ? headers[idx] : ("列" + (idx + 1));
-      parts.push(h + "：" + s);
-    }
-  });
-  return parts.join(" | ");
-}
-
-$("btnLocate").onclick = () => {
-  if (lastHitRow < 0) { toast("提示", "还没有成功核对任何项目"); return; }
-  const wrap = document.querySelector(".table-wrap");
-  const tr = document.querySelector("tr[data-i='"+lastHitRow+"']");
-  if (wrap && tr) {
-    wrap.scrollTop = tr.offsetTop - wrap.clientHeight / 2 + tr.clientHeight / 2;
-    toast("已定位", "已滚动到最新核对行");
-  }
-};
-
-/* ===== 核对逻辑 ===== */
-function addLog(code, result, info) {
-  const d = new Date();
-  const timeStr = d.getFullYear() + "-" +
-    String(d.getMonth()+1).padStart(2,'0') + "-" +
-    String(d.getDate()).padStart(2,'0') + " " +
-    String(d.getHours()).padStart(2,'0') + ":" +
-    String(d.getMinutes()).padStart(2,'0') + ":" +
-    String(d.getSeconds()).padStart(2,'0');
-  checkLog.push({ time: timeStr, code: code, result: result, info: info || "" });
-  saveLogToDB();
-}
-
-function check(code){
-  code = String(code||"").trim(); if(!code) return;
-  if (matchColIdx === null || matchColIdx === undefined) {
-    toast("提示", "请先选择核对模式");
-    return;
-  }
-
-  const positions = codeIndex.get(code);
-  let hit = null, dup = false;
-  if (positions) {
-    for (const p of positions) {
-      if (!matchedCells.has(p.r + "-" + p.c)) { hit = p; break; }
-    }
-    if (!hit) dup = true;
-  }
-
-  const ts = new Date().toLocaleTimeString();
-  if (hit) {
-    matchedCells.add(hit.r + "-" + hit.c);
-    matchedSet.add(hit.r);
-    lastHitRow = hit.r;
-
-    logMsg("ok", ts + " ✅ 匹配成功：" + code);
-    renderTable(); updateStats();
-    saveMatched();
-
-    const info = getRowInfo(hit.r) + " ｜ 命中列：" + (headers[hit.c] || ("列" + (hit.c + 1)));
-    addLog(code, "成功", info);
-    playBeep('ok'); vibrate('ok'); speak("可以配送");
-    toast("✅ 已核对 · 可以配送", info);
-  } else if (dup) {
-    logMsg("dup", ts + " ⚠️ 重复扫描：" + code);
-    addLog(code, "重复", "该条码已核对过");
-    playBeep('dup'); vibrate('dup'); speak("重复扫描");
-    toast("⚠️ 重复扫描", "该条码已核对过：" + code);
-  } else {
-    logMsg("miss", ts + " ❌ 未在表格中找到：" + code);
-    addLog(code, "失败", "未在表格中找到");
-    playBeep('miss'); vibrate('miss'); speak("不可配送，需滞留");
-    toast("❌ 不可配送，需滞留", "未在表格中找到：" + code);
-  }
-  if (matchedSet.size === rows.length && rows.length) speak("核对完成");
-}
-
-/* =========================================================
-   语音识别
-   ========================================================= */
-let voiceRec = null;
-let voiceRawText = "";
-let voiceNormalizedText = "";
-let voiceSilenceTimer = null;
-let voiceActive = false;
-
-/* 归一化：去空格、去标点、中文数字转阿拉伯、字母转大写 */
-function normalizeSpokenCode(text) {
-  if (!text) return "";
-  let s = String(text);
-
-  // 1. 全角→半角
-  s = s.replace(/[\uFF01-\uFF5E]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0));
-
-  // 2. 去所有空白（含中文空格、制表符、换行）——这就是"忽略停顿"的关键一步
-  s = s.replace(/[\s\u3000]+/g, "");
-
-  // 3. 去常见标点
-  s = s.replace(/[,，.。、;；:：\-_\/\\|'"`~!@#$%^&*()\[\]{}<>?·。！？；：""''（）【】《》…]/g, "");
-
-  // 4. 中文数字→阿拉伯数字（单字映射，含无线电常用读法）
-  const cnMap = {
-    '零':'0','〇':'0','○':'0','洞':'0',
-    '一':'1','壹':'1','幺':'1',
-    '二':'2','贰':'2','两':'2',
-    '三':'3','叁':'3',
-    '四':'4','肆':'4',
-    '五':'5','伍':'5',
-    '六':'6','陆':'6',
-    '七':'7','柒':'7','拐':'7',
-    '八':'8','捌':'8',
-    '九':'9','玖':'9','勾':'9'
-  };
-  let out = "";
-  for (let i = 0; i < s.length; i++) {
-    const ch = s[i];
-    out += (cnMap[ch] !== undefined) ? cnMap[ch] : ch;
-  }
-  s = out;
-
-  // 5. 字母→大写
-  s = s.toUpperCase();
-
-  return s;
-}
-
-function getSpeechRecognitionClass() {
-  return window.SpeechRecognition || window.webkitSpeechRecognition || null;
-}
-
-function startVoiceRecognition() {
-  const SR = getSpeechRecognitionClass();
-  if (!SR) {
-    popup("不支持语音识别",
-      "当前浏览器不支持网页语音识别。<br><br>建议使用：<br>• Android Chrome / Edge<br>• iOS Safari 14.5+<br>• 桌面 Chrome / Edge<br><br>微信内置浏览器不支持，请用系统浏览器打开。");
-    return;
-  }
-
-  voiceRawText = "";
-  voiceNormalizedText = "";
-  voiceActive = true;
-  $("voiceRawText").textContent = "（等待语音…）";
-  $("voiceNormalizedText").textContent = "—";
-  $("voiceStatus").textContent = "🎤 正在聆听… 请读出条码";
-  $("voiceConfirmBtn").disabled = true;
-  $("voiceMask").classList.add("show");
-
-  try {
-    voiceRec = new SR();
-    voiceRec.lang = 'zh-CN';
-    voiceRec.continuous = true;      // 持续识别（忽略中间停顿）
-    voiceRec.interimResults = true;  // 实时显示
-    voiceRec.maxAlternatives = 1;
-
-    voiceRec.onresult = (e) => {
-      let interim = "";
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        const t = e.results[i][0].transcript;
-        if (e.results[i].isFinal) {
-          voiceRawText += t;
-        } else {
-          interim += t;
-        }
-      }
-      const displayRaw = voiceRawText + interim;
-      const norm = normalizeSpokenCode(displayRaw);
-
-      $("voiceRawText").textContent = displayRaw || "（等待语音…）";
-      $("voiceNormalizedText").textContent = norm || "—";
-      if (norm) $("voiceConfirmBtn").disabled = false;
-
-      // 静音计时器：1.5 秒内没有新结果就自动结束
-      clearTimeout(voiceSilenceTimer);
-      voiceSilenceTimer = setTimeout(() => {
-        try { voiceRec.stop(); } catch(e){}
-      }, 1500);
-    };
-
-    voiceRec.onerror = (e) => {
-      console.warn("[语音] 错误:", e.error);
-      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
-        $("voiceStatus").textContent = "❌ 麦克风权限被拒绝，请在浏览器设置中允许";
-      } else if (e.error === 'no-speech') {
-        $("voiceStatus").textContent = "❌ 没有检测到语音，请点「重说」";
-      } else if (e.error === 'network') {
-        $("voiceStatus").textContent = "❌ 网络错误，请检查网络后重试";
-      } else {
-        $("voiceStatus").textContent = "❌ 识别出错：" + e.error;
-      }
-      voiceActive = false;
-    };
-
-    voiceRec.onend = () => {
-      voiceActive = false;
-      clearTimeout(voiceSilenceTimer);
-      const norm = normalizeSpokenCode(voiceRawText);
-      voiceNormalizedText = norm;
-      if (norm) {
-        $("voiceStatus").textContent = "✅ 识别完成，请核对后点「确认提交」";
-        $("voiceConfirmBtn").disabled = false;
-      } else {
-        $("voiceStatus").textContent = "⚠️ 没有识别到内容，请点「重说」";
-        $("voiceConfirmBtn").disabled = true;
-      }
-    };
-
-    voiceRec.start();
-  } catch(err) {
-    console.error("[语音] 启动失败:", err);
-    $("voiceStatus").textContent = "❌ 无法启动语音识别：" + (err.message || err);
-    voiceActive = false;
-  }
-}
-
-function stopVoiceRecognition() {
-  clearTimeout(voiceSilenceTimer);
-  voiceSilenceTimer = null;
-  if (voiceRec) {
-    try { voiceRec.stop(); } catch(e){}
-    try { voiceRec.abort(); } catch(e){}
-    voiceRec = null;
-  }
-  voiceActive = false;
-}
-
-function closeVoicePanel() {
-  stopVoiceRecognition();
-  $("voiceMask").classList.remove("show");
-}
-
-$("btnVoice").onclick = () => {
-  initAudioAndUnlock();
-  startVoiceRecognition();
-};
-
-$("voiceCancelBtn").onclick = () => {
-  closeVoicePanel();
-};
-
-$("voiceRetryBtn").onclick = () => {
-  stopVoiceRecognition();
-  setTimeout(() => startVoiceRecognition(), 200);
-};
-
-$("voiceConfirmBtn").onclick = () => {
-  const code = voiceNormalizedText || normalizeSpokenCode(voiceRawText);
-  if (!code) {
-    toast("提示", "没有可提交的内容");
-    return;
-  }
-  closeVoicePanel();
-  check(code);
-};
-
-document.addEventListener("visibilitychange", function() {
-  if (document.hidden && voiceActive) {
-    closeVoicePanel();
-  }
-});
-
-/* =========================================================
-   摄像头能力诊断
-   ========================================================= */
-function showCamStatus(track) {
-  const el = $("camStatus");
-  if (!el || !track) return;
-  const caps = (track.getCapabilities ? track.getCapabilities() : {}) || {};
-  const parts = [];
-
-  if (Array.isArray(caps.focusMode) && caps.focusMode.length) {
-    const f = caps.focusMode;
-    if (f.includes('continuous')) parts.push('自动对焦✓');
-    else if (f.includes('single-shot')) parts.push('单次对焦');
-    else parts.push('对焦: ' + f.join('/'));
-  } else {
-    parts.push('对焦: 不支持');
-  }
-
-  if (caps.zoom && caps.zoom.max > caps.zoom.min) {
-    parts.push('变焦 ' + caps.zoom.min.toFixed(1) + '-' + caps.zoom.max.toFixed(1));
-  }
-
-  el.textContent = parts.join(' | ');
-  el.style.display = "block";
-}
-
-/* =========================================================
-   手动干预控制
-   ========================================================= */
-async function applyManualFocus(track, value) {
-  if (!track) return;
-  try {
-    const settings = track.getSettings();
-    await track.applyConstraints({
-      width: settings.width || { ideal: 1920 },
-      height: settings.height || { ideal: 1080 },
-      advanced: [{ focusMode: 'manual', focusDistance: value }]
-    });
-    console.log("[手动对焦] 距离设为:", value);
-  } catch (e) {
-    console.warn("手动对焦设置失败", e);
-  }
-}
-
-async function applyZoomBump(track, delta) {
-  if (!track) return;
-  try {
-    const caps = track.getCapabilities();
-    const settings = track.getSettings();
-    let currentZoom = settings.zoom || (caps.zoom ? caps.zoom.min : 1);
-    let targetZoom = currentZoom + delta;
-    if (caps.zoom) {
-      targetZoom = Math.max(caps.zoom.min, Math.min(caps.zoom.max, targetZoom));
-    }
-    await track.applyConstraints({
-      width: settings.width || { ideal: 1920 },
-      height: settings.height || { ideal: 1080 },
-      zoom: targetZoom
-    });
-    console.log("[变焦微调] 从", currentZoom, "调整到", targetZoom);
-    if ($("zoomSlider").style.display !== "none") {
-      $("zoomSlider").value = targetZoom;
-    }
-  } catch (e) {
-    console.warn("变焦微调失败", e);
-  }
-}
-
-async function tryFocusAtPoint(track, x, y) {
-  if (!track) return false;
-  const caps = (track.getCapabilities ? track.getCapabilities() : {}) || {};
-  const settings = track.getSettings();
-  const baseConstraints = {
-    width: settings.width || { ideal: 1920 },
-    height: settings.height || { ideal: 1080 }
-  };
-
-  if (Array.isArray(caps.focusMode) && caps.focusMode.includes('continuous')) {
-    try {
-      await track.applyConstraints(Object.assign({}, baseConstraints, { advanced: [{ focusMode: 'continuous' }] }));
-      return true;
-    } catch(e) {}
-  }
-
-  if (Array.isArray(caps.focusMode) && caps.focusMode.includes('single-shot')) {
-    try {
-      await track.applyConstraints(Object.assign({}, baseConstraints, { advanced: [{ focusMode: 'single-shot' }] }));
-      setTimeout(() => {
-        if (Array.isArray(caps.focusMode) && caps.focusMode.includes('continuous')) {
-          try { track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }); } catch(e){}
-        }
-      }, 2000);
-      return true;
-    } catch(e) {}
-  }
-
-  if (caps.zoom && caps.zoom.max > caps.zoom.min) {
-    try {
-      const currentZoom = track.getSettings().zoom || caps.zoom.min;
-      const bump = Math.min(caps.zoom.max, currentZoom + 0.1);
-      await track.applyConstraints({ zoom: bump });
-      setTimeout(() => {
-        try { track.applyConstraints({ zoom: currentZoom }); } catch(e){}
-      }, 200);
-      return true;
-    } catch(e) {}
-  }
-
-  return false;
-}
-
-function showFocusRing(clientX, clientY, rect) {
-  const ring = $("focusRing");
-  if (!ring) return;
-  const px = clientX - rect.left;
-  const py = clientY - rect.top;
-  ring.style.left = px + 'px';
-  ring.style.top = py + 'px';
-  ring.classList.remove('active');
-  void ring.offsetWidth;
-  ring.classList.add('active');
-  setTimeout(() => ring.classList.remove('active'), 950);
-}
-
-/* =========================================================
-   扫码
-   ========================================================= */
-let camStream = null, camTrack = null, camVideo = null;
-let nativeDetector = null, scanning = false, starting = false;
-let scanTimer = null, loopBusy = false;
-let scanner = null, fallbackMode = false;
-let lastCode = "", lastCodeTime = 0;
-
-function emitCode(code){
-  code = String(code||"").trim();
-  if(!code) return;
-  const now = Date.now();
-  if(code === lastCode && now - lastCodeTime < 2000) return;
-  lastCode = code; lastCodeTime = now;
-  check(code);
-}
-
-const WANTED_FORMATS = ["ean_13","ean_8","upc_a","upc_e","code_128","code_39","code_93","itf","codabar","qr_code"];
-
-async function makeDetector(){
-  if(!("BarcodeDetector" in window)) return null;
-  try{
-    const sup = await BarcodeDetector.getSupportedFormats();
-    const formats = WANTED_FORMATS.filter(f => sup.includes(f));
-    if(formats.length) return new BarcodeDetector({ formats });
-  }catch(e){}
-  return null;
-}
-
-async function openCameraWithBestConstraints() {
-  const base = { facingMode: { ideal: "environment" } };
-
-  if (IS_IOS) {
-    console.log("[摄像头] iOS 平台，使用简化约束");
-    const iosTries = [
-      { audio:false, video: Object.assign({}, base, { width: { ideal: 1280 }, height: { ideal: 720 } }) },
-      { audio:false, video: Object.assign({}, base, { width: { ideal: 640 }, height: { ideal: 480 } }) },
-      { audio:false, video: base }
-    ];
-    let lastErr = null;
-    for (let i = 0; i < iosTries.length; i++) {
-      try {
-        const s = await navigator.mediaDevices.getUserMedia(iosTries[i]);
-        console.log("[摄像头] iOS 成功使用第 " + (i+1) + " 套约束");
-        return s;
-      } catch(e) {
-        lastErr = e;
-        console.warn("[摄像头] iOS 第 " + (i+1) + " 套失败：", e.name || e.message);
-      }
-    }
-    throw lastErr || new Error("无法打开摄像头");
-  }
-
-  const ptzRequest = { zoom: true };
-  const advancedFocus = [
-    { focusMode: "continuous" },
-    { exposureMode: "continuous" },
-    { whiteBalanceMode: "continuous" }
-  ];
-  const tries = [
-    { audio:false, video: Object.assign({}, base, {
-        width:  { ideal: 1920 }, height: { ideal: 1080 },
-        frameRate: { ideal: 30 },
-        advanced: advancedFocus.concat([ptzRequest])
-    })},
-    { audio:false, video: Object.assign({}, base, {
-        width:  { ideal: 1280 }, height: { ideal: 720 },
-        frameRate: { ideal: 30 },
-        advanced: advancedFocus.concat([ptzRequest])
-    })},
-    { audio:false, video: Object.assign({}, base, {
-        width:  { ideal: 1280 }, height: { ideal: 720 }
-    })},
-    { audio:false, video: Object.assign({}, base, {
-        width:  { ideal: 640 }, height: { ideal: 480 }
-    })},
-    { audio:false, video: base }
-  ];
-  let stream = null, lastErr = null;
-  for (let i = 0; i < tries.length; i++) {
-    try {
-      stream = await navigator.mediaDevices.getUserMedia(tries[i]);
-      console.log("[摄像头] 成功使用第 " + (i+1) + " 套约束");
-      return stream;
-    } catch(e) {
-      lastErr = e;
-      console.warn("[摄像头] 第 " + (i+1) + " 套约束失败：", e.name || e.message);
-    }
-  }
-  throw lastErr || new Error("无法打开摄像头");
-}
-
-async function tuneTrackAfterStart(track) {
-  if(!track) return;
-
-  if (IS_IOS) {
-    console.log("[调优] iOS 平台跳过 applyConstraints");
-    return;
-  }
-
-  try {
-    const caps = (track.getCapabilities ? track.getCapabilities() : {}) || {};
-
-    if (Array.isArray(caps.focusMode) && caps.focusMode.includes("continuous")) {
-      try { await track.applyConstraints({ advanced: [{ focusMode: "continuous" }] }); }
-      catch(e) {}
-    } else if (Array.isArray(caps.focusMode) && caps.focusMode.length) {
-      try { await track.applyConstraints({ advanced: [{ focusMode: "single-shot" }] }); } catch(e){}
-      if (window._focusInterval) clearInterval(window._focusInterval);
-      window._focusInterval = setInterval(() => {
-        try { track.applyConstraints({ advanced: [{ focusMode: "single-shot" }] }); } catch(e){}
-      }, 1500);
-    }
-
-    if (Array.isArray(caps.exposureMode) && caps.exposureMode.includes("continuous")) {
-      try { await track.applyConstraints({ advanced: [{ exposureMode: "continuous" }] }); } catch(e){}
-    }
-  } catch(e) {
-    console.warn("tuneTrackAfterStart 出错：", e);
-  }
-}
-
-async function startNativeScan(){
-  const det = await makeDetector();
-  if(!det) throw new Error("no-native-detector");
-
-  const container = $("reader");
-  const oldVideo = container.querySelector("video");
-  if (oldVideo) container.removeChild(oldVideo);
-  const oldOverlay = container.querySelector(".scan-frame");
-  if (oldOverlay) container.removeChild(oldOverlay);
-
-  const video = document.createElement("video");
-  video.setAttribute("playsinline", "");
-  video.setAttribute("muted", "");
-  video.autoplay = true;
-  video.muted = true;
-  container.insertBefore(video, container.firstChild);
-
-  const overlay = document.createElement("div");
-  overlay.className = "scan-frame";
-  container.appendChild(overlay);
-
-  const stream = await openCameraWithBestConstraints();
-  video.srcObject = stream;
-  camStream = stream;
-  camTrack = stream.getVideoTracks()[0];
-  await video.play();
-
-  await tuneTrackAfterStart(camTrack);
-
-  showCamStatus(camTrack);
-  $("camTip").style.display = "block";
-
-  const zoomSlider = $("zoomSlider");
-  const zoomRow = $("zoomRow");
-  const focusDistanceSlider = $("focusDistanceSlider");
-  const focusDistanceRow = $("focusDistanceRow");
-  const focusStepRow = $("focusStepRow");
-  const controlPanel = $("controlPanel");
-
-  const caps = camTrack.getCapabilities ? camTrack.getCapabilities() : {};
-  let hasAnyControl = false;
-
-  const browserSupportsZoom = navigator.mediaDevices.getSupportedConstraints().zoom;
-  const deviceSupportsZoom = caps.zoom && caps.zoom.max > caps.zoom.min;
-
-  if (browserSupportsZoom && deviceSupportsZoom) {
-      zoomSlider.min = caps.zoom.min;
-      zoomSlider.max = caps.zoom.max;
-      zoomSlider.step = (caps.zoom.max - caps.zoom.min) / 20;
-      zoomSlider.value = camTrack.getSettings().zoom || caps.zoom.min;
-      zoomRow.style.display = "flex";
-      hasAnyControl = true;
-
-      zoomSlider.oninput = async (e) => {
-          const val = parseFloat(e.target.value);
-          try {
-              await camTrack.applyConstraints({ zoom: val });
-          } catch (err) {
-              console.error("变焦应用失败:", err.name, err.message);
-          }
-      };
-  } else {
-      zoomRow.style.display = "none";
-  }
-
-  if (caps.focusDistance && caps.focusDistance.max > caps.focusDistance.min) {
-      focusDistanceSlider.min = caps.focusDistance.min;
-      focusDistanceSlider.max = caps.focusDistance.max;
-      focusDistanceSlider.step = caps.focusDistance.step || 0.01;
-      let defaultVal = (caps.focusDistance.min + caps.focusDistance.max) / 2;
-      focusDistanceSlider.value = defaultVal;
-      focusDistanceRow.style.display = "flex";
-      hasAnyControl = true;
-
-      focusDistanceSlider.oninput = async (e) => {
-          const val = parseFloat(e.target.value);
-          await applyManualFocus(camTrack, val);
-      };
-  } else {
-      focusDistanceRow.style.display = "none";
-  }
-
-  if (!caps.focusDistance || caps.focusDistance.max <= caps.focusDistance.min) {
-      focusStepRow.style.display = "flex";
-      hasAnyControl = true;
-
-      $("btnFocusMinus").onclick = () => applyZoomBump(camTrack, -0.2);
-      $("btnFocusPlus").onclick = () => applyZoomBump(camTrack, 0.2);
-  } else {
-      focusStepRow.style.display = "none";
-  }
-
-  if (hasAnyControl) {
-      controlPanel.style.display = "flex";
-  } else {
-      controlPanel.style.display = "none";
-  }
-
-  video.addEventListener("click", async ev => {
-    const rect = video.getBoundingClientRect();
-    showFocusRing(ev.clientX, ev.clientY, rect);
-    const x = (ev.clientX - rect.left) / rect.width;
-    const y = (ev.clientY - rect.top) / rect.height;
-    const ok = await tryFocusAtPoint(camTrack, x, y);
-    if (!ok) {
-      toast("提示", "当前设备或浏览器不支持网页手动对焦，请使用底部控制面板微调");
-    }
-  });
-
-  nativeDetector = det;
-  camVideo = video;
-  scanning = true;
-  scanLoop();
-  return true;
-}
-
-async function scanLoop(){
-  if(!scanning || !nativeDetector || !camVideo) return;
-  if(!loopBusy && camVideo.readyState >= 2 && camVideo.videoWidth > 0){
-    loopBusy = true;
-    try{
-      const codes = await nativeDetector.detect(camVideo);
-      if(codes && codes.length){
-        for(const c of codes){ if(c.rawValue) emitCode(c.rawValue); }
-      }
-    }catch(e){}
-    loopBusy = false;
-  }
-  scanTimer = setTimeout(scanLoop, 80);
-}
-
-async function startFallbackScan(){
-  if(typeof Html5Qrcode === "undefined") throw new Error("扫码库未加载");
-  fallbackMode = true;
-  const el = $("reader");
-  el.innerHTML = "";
-  scanner = new Html5Qrcode("reader", false);
-  await scanner.start(
-    { facingMode: "environment" },
-    { fps: 15, qrbox: { width: 280, height: 160 }, experimentalFeatures: { useBarCodeDetectorIfSupported: true } },
-    code => emitCode(code),
-    () => {}
-  );
-  await boostStreamResolution();
-  scanning = true;
-}
-
-async function boostStreamResolution(){
-  const v = $("reader").querySelector("video");
-  if(!v || !v.srcObject) return;
-  const t = v.srcObject.getVideoTracks()[0];
-  if(!t) return;
-  await tuneTrackAfterStart(t);
-}
-
-function stopCamStream(){
-  if(window._focusInterval){ clearInterval(window._focusInterval); window._focusInterval = null; }
-  if(camStream){
-    try{
-      camStream.getTracks().forEach(t => t.stop());
-    }catch(e){ console.warn("停止轨道失败", e); }
-  }
-  camStream = null; camTrack = null;
-  if(camVideo) {
-    try { camVideo.pause(); } catch(e){}
-    try { camVideo.srcObject = null; } catch(e){}
-  }
-  camVideo = null;
-  nativeDetector = null;
-}
-
-function forceRestoreCameraUI() {
-  try { $("readerWrap").style.display = "none"; } catch(e){}
-  try { $("camTip").style.display = "none"; } catch(e){}
-  try { $("camStatus").style.display = "none"; } catch(e){}
-  try { $("controlPanel").style.display = "none"; } catch(e){}
-  try { $("btnCamera").style.display = ""; } catch(e){}
-  try { $("btnStop").style.display = "none"; } catch(e){}
-  try { $("btnCamera").disabled = false; } catch(e){}
-}
-
-function stopScan(){
-  console.log("[stopScan] 开始");
-
-  forceRestoreCameraUI();
-
-  scanning = false;
-  starting = false;
-
-  if (scanTimer) { clearTimeout(scanTimer); scanTimer = null; }
-  if (window._focusInterval) { clearInterval(window._focusInterval); window._focusInterval = null; }
-
-  const oldStream = camStream;
-  const oldVideo = camVideo;
-  const oldScanner = scanner;
-  const wasFallback = fallbackMode;
-
-  camStream = null; camTrack = null; camVideo = null; nativeDetector = null;
-  scanner = null; fallbackMode = false;
-
-  try {
-    const readerEl = $("reader");
-    readerEl.querySelectorAll("video").forEach(v => {
-      try { v.pause(); } catch(e){}
-      try { v.srcObject = null; } catch(e){}
-      try { if (v.parentNode) v.parentNode.removeChild(v); } catch(e){}
-    });
-  } catch(e){ console.warn("移除 video 元素失败", e); }
-
-  setTimeout(function() {
-    try {
-      if (oldStream) {
-        oldStream.getTracks().forEach(t => { try { t.stop(); } catch(e){} });
-      }
-    } catch(e){}
-    if (oldVideo) {
-      try { oldVideo.pause(); } catch(e){}
-      try { oldVideo.srcObject = null; } catch(e){}
-    }
-    if (wasFallback && oldScanner) {
-      try {
-        const p = oldScanner.stop();
-        if (p && typeof p.then === "function") {
-          p.then(() => { try { oldScanner.clear(); } catch(e){} })
-           .catch(() => { try { oldScanner.clear(); } catch(e){} });
-        } else {
-          try { oldScanner.clear(); } catch(e){}
-        }
-      } catch(e) {
-        try { oldScanner.clear(); } catch(e){}
-      }
-    }
-  }, 30);
-
-  setTimeout(function() {
-    try {
-      if (!scanning && !starting) {
-        const camBtn = $("btnCamera");
-        const stopBtn = $("btnStop");
-        if (camBtn && camBtn.style.display === "none" && stopBtn && stopBtn.style.display !== "none") {
-          console.log("[stopScan] 兜底强制恢复 UI");
-          forceRestoreCameraUI();
-        }
-      }
-    } catch(e){}
-  }, 800);
-
-  console.log("[stopScan] 完成");
-}
-
-function cameraErrText(e){
-  const name = (e && e.name) || "";
-  const raw  = (e && e.message) ? e.message : String(e || "");
-  switch(name){
-    case "NotAllowedError": return "摄像头权限被拒绝。\n\n请点击浏览器地址栏左侧的 🔒 图标，把摄像头改为「允许」，刷新重试。";
-    case "NotFoundError": return "没有检测到摄像头设备。";
-    case "NotReadableError": return "摄像头被占用。请关闭其他使用相机的程序后重试。";
-    case "OverconstrainedError": return "手机不支持这么高的分辨率。";
-    default: return "错误类型：" + (name || "未知") + "\n" + raw;
-  }
-}
-
-$("btnCamera").onclick = async () => {
-  if(scanning || starting) return;
-  initAudioAndUnlock();
-  if(!hasGetUserMedia()){
-    popup("不支持摄像头", "请使用 Chrome 或系统自带浏览器打开，不要用微信内置浏览器。");
-    return;
-  }
-  starting = true;
-  $("btnCamera").disabled = true;
-  $("readerWrap").style.display = "block";
-
-  try{
-    let ok = false;
-    if("BarcodeDetector" in window && !IS_IOS){
-      try{ ok = await startNativeScan(); }
-      catch(e){
-        console.warn("原生扫码不可用，回退降级方案：", e);
-        stopCamStream();
-        const readerEl = $("reader");
-        while (readerEl.firstChild) readerEl.removeChild(readerEl.firstChild);
-      }
-    }
-    if(!ok){ await startFallbackScan(); }
-    scanning = true;
-    $("btnCamera").style.display = "none";
-    $("btnStop").style.display = "";
-  }catch(e){
-    console.error("启动扫描失败：", e);
-    stopScan();
-    popup("无法开启相机", cameraErrText(e));
-  }finally{
-    starting = false;
-    $("btnCamera").disabled = false;
-  }
-};
-
-$("btnStop").onclick = function() {
-  console.log("[按钮] 停止扫描被点击");
-  stopScan();
-};
-
-/* =========================================================
-   导出工具
-   ========================================================= */
-function getTodayStr() {
-  const d = new Date();
-  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, '0') + "-" + String(d.getDate()).padStart(2, '0');
-}
-async function buildAndShareExcel(rowIdxList, outBaseName) {
-  if (typeof ExcelJS === "undefined") { toast("导出组件未加载完成", "请稍后再试"); return; }
-  if (!rowIdxList.length) { toast("提示", "没有可导出的数据"); return; }
-  try {
-    const wb = new ExcelJS.Workbook();
-    const ws = wb.addWorksheet(sheetName || "核对结果");
-    ws.addRow(headers).font = { bold: true };
-    rowIdxList.forEach(i => {
-      const r = rows[i] || [];
-      const row = ws.addRow(headers.map((_, j) => r[j] ?? ""));
-      headers.forEach((_, j) => {
-        if (matchedCells.has(i + "-" + j)) {
-          const cell = row.getCell(j + 1);
-          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFC7CE" } };
-          cell.font = { color: { argb: "FF9C0006" }, bold: true };
-        }
-      });
-    });
-    headers.forEach((h, j) => { ws.getColumn(j + 1).width = Math.max(12, String(h).length * 2 + 6); });
-
-    const buf = await wb.xlsx.writeBuffer();
-    const outName = outBaseName + ".xlsx";
-    $("exportName").textContent = "已生成：" + outName;
-
-    const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-    const file = new File([blob], outName, { type: blob.type });
-
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      try { await navigator.share({ files: [file], title: outBaseName }); return; }
-      catch(e){ if(e.name === "AbortError") return; }
-    }
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = outName;
-    a.click();
-    setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
-    toast("已下载", outName);
-  } catch (err) { toast("导出失败", err.message); }
-}
-
-$("btnExport").onclick = () => {
-  if (!rows.length) return;
-  buildAndShareExcel(rows.map((_, i) => i), getTodayStr());
-};
-$("btnExportMatched").onclick = () => {
-  if (!rows.length) return;
-  if (matchedSet.size === 0) { toast("提示", "还没有已核对的行可导出"); return; }
-  const idxList = Array.from(matchedSet).sort((a, b) => a - b);
-  buildAndShareExcel(idxList, getTodayStr() + "已配送的明细");
-};
-$("btnExportLog").onclick = async () => {
-  if (typeof ExcelJS === "undefined") { toast("导出组件未加载完成", "请稍后再试"); return; }
-  if (!checkLog.length) { toast("提示", "还没有运行日志可导出"); return; }
-  try {
-    const wb = new ExcelJS.Workbook();
-    const ws = wb.addWorksheet("核对日志");
-    const headerRow = ws.addRow(["序号", "时间", "条码", "核对结果", "详细信息"]);
-    headerRow.font = { bold: true };
-    checkLog.forEach((item, idx) => {
-      const row = ws.addRow([idx + 1, item.time, item.code, item.result, item.info || ""]);
-      if (item.result === "成功") row.getCell(4).font = { color: { argb: "FF198754" }, bold: true };
-      else if (item.result === "失败") row.getCell(4).font = { color: { argb: "FFDC3545" }, bold: true };
-      else if (item.result === "重复") row.getCell(4).font = { color: { argb: "FFFD7E14" }, bold: true };
-    });
-    ws.getColumn(1).width = 8; ws.getColumn(2).width = 22; ws.getColumn(3).width = 25; ws.getColumn(4).width = 12; ws.getColumn(5).width = 60;
-
-    const buf = await wb.xlsx.writeBuffer();
-    const outName = getTodayStr() + "核对日志.xlsx";
-    $("exportName").textContent = "已生成：" + outName;
-    const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-    const file = new File([blob], outName, { type: blob.type });
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      try { await navigator.share({ files: [file], title: "核对日志" }); return; }
-      catch(e){ if(e.name === "AbortError") return; }
-    }
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob); a.download = outName; a.click();
-    setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
-    toast("已下载", outName);
-  } catch (err) { toast("导出失败", err.message); }
-};
-
-/* =========================================================
-   清除保存的数据
-   ========================================================= */
-$("btnClearStorage").onclick = function() {
-  if (!confirm("确定要清除已保存的表格、核对进度和运行日志吗？此操作不可恢复。")) return;
-
-  hasSavedData = false;
-  headers = []; rows = [];
-  matchColIdx = null;
-  matchedSet = new Set();
-  matchedCells = new Set();
-  codeIndex = new Map();
-  checkLog = [];
-  lastHitRow = -1; fileBase = "核对结果";
-
-  $("restoreBanner").style.display = "none";
-  $("fileName").textContent = "";
-  $("colBadge").style.display = "none";
-  showDataButtons(false);
-  $("statCard").style.display = "none";
-  $("tableCard").style.display = "none";
-  $("logCard").style.display = "none";
-  $("readerWrap").style.display = "none";
-  $("grid").innerHTML = "";
-  $("log").innerHTML = "";
-  $("btnCamera").style.display = "none";
-  $("btnStop").style.display = "none";
-  $("uploadBusy").style.display = "none";
-  $("btnUpload").disabled = false;
-  $("controlPanel").style.display = "none";
-  closeVoicePanel();
-
-  try { deleteTableData(); } catch(e) {}
-  try { deleteLogFromDB(); } catch(e) {}
-  clearMatched();
-
-  toast("已清除", "保存的数据已删除");
-};
-
-/* =========================================================
-   页面加载后恢复
-   ========================================================= */
-async function tryRestore() {
-  try {
-    checkLog = await loadLogFromDB();
-
-    const data = await loadTableData();
-    if (!data || !data.rows || !data.rows.length) {
-      hasSavedData = false;
-      return;
-    }
-
-    hasSavedData = true;
-
-    headers = data.headers || [];
-    rows = data.rows || [];
-    matchColIdx = (data.matchColIdx === undefined) ? null : data.matchColIdx;
-    sheetName = data.sheetName || "核对结果";
-    fileBase = data.fileBase || "核对结果";
-
-    const needPick = (matchColIdx === null ||
-                      (matchColIdx >= 0 && matchColIdx >= headers.length));
-
-    if (needPick) {
-      pickColumn(null, function(idx) {
-        matchColIdx = idx;
-        $("colBadge").style.display = "inline";
-        $("colBadge").textContent = "核对模式：" + modeText(idx);
-
-        matchedCells = new Set(loadMatchedCells());
-        rebuildMatchedSetFromCells();
-
-        buildIndex();
-        renderTable(); updateStats();
-        showDataButtons(true);
-        $("statCard").style.display = "block";
-        $("tableCard").style.display = "block";
-        saveTableData({
-          headers: headers, rows: rows, matchColIdx: idx,
-          sheetName: sheetName, fileBase: fileBase, savedAt: Date.now()
-        });
-        toast("已读取 " + rows.length + " 行数据", "");
-      });
-      return;
-    }
-
-    matchedCells = new Set(loadMatchedCells());
-    rebuildMatchedSetFromCells();
-
-    $("fileName").textContent = "（已恢复）" + fileBase + ".xlsx";
-    $("colBadge").style.display = "inline";
-    $("colBadge").textContent = "核对模式：" + modeText(matchColIdx);
-
-    buildIndex();
-    renderTable();
-    updateStats();
-
-    showDataButtons(true);
-    $("statCard").style.display = "block";
-    $("tableCard").style.display = "block";
-    $("logCard").style.display = checkLog.length ? "block" : "none";
-
-    $("restoreText").innerHTML = "💾 已恢复上次核对进度（" + matchedSet.size + "/" + rows.length + " 行已核对，日志 " + checkLog.length + " 条）";
-    $("restoreBanner").style.display = "flex";
-  } catch(e) {
-    console.warn("恢复数据失败", e);
-    hasSavedData = false;
-  }
-}
-
-setTimeout(tryRestore, 300);
+let sheetName="",headers=[],rows=[];
+let matchColIdx=null,matchedSet=new Set(),matchedCells=new Set(),codeIndex=new Map();
+let fileBase="核对结果",lastHitRow=-1,hasSavedData=false,checkLog=[];
+const $=id=>document.getElementById(id);
+const IS_IOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+
+function showDataButtons(show){document.querySelectorAll(".need-data").forEach(el=>{el.style.display=show?"":"none"})}
+
+/* IndexedDB */
+const DB_NAME='philips_check_db',DB_VERSION=1,DB_STORE='table_data';
+const KEY_MATCHED_CELLS='philips_check_matched_cells_v1',KEY_MATCHED_OLD='philips_check_matched_v1';
+let _dbPromise=null;
+function openDB(){if(_dbPromise)return _dbPromise;_dbPromise=new Promise((resolve,reject)=>{if(!window.indexedDB){reject(new Error("IndexedDB 不可用"));return}const req=indexedDB.open(DB_NAME,DB_VERSION);req.onupgradeneeded=()=>{const db=req.result;if(!db.objectStoreNames.contains(DB_STORE))db.createObjectStore(DB_STORE)};req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error)});return _dbPromise}
+function dbPut(k,v){return openDB().then(db=>new Promise((resolve,reject)=>{const tx=db.transaction(DB_STORE,'readwrite');tx.objectStore(DB_STORE).put(v,k);tx.oncomplete=()=>resolve(true);tx.onerror=()=>reject(tx.error)})).catch(e=>{console.warn("dbPut失败",k,e);return false})}
+function dbGet(k){return openDB().then(db=>new Promise((resolve,reject)=>{const tx=db.transaction(DB_STORE,'readonly');const req=tx.objectStore(DB_STORE).get(k);req.onsuccess=()=>resolve(req.result===undefined?null:req.result);req.onerror=()=>reject(req.error)})).catch(e=>{console.warn("dbGet失败",k,e);return null})}
+function dbDelete(k){return openDB().then(db=>new Promise((resolve,reject)=>{const tx=db.transaction(DB_STORE,'readwrite');tx.objectStore(DB_STORE).delete(k);tx.oncomplete=()=>resolve(true);tx.onerror=()=>reject(tx.error)})).catch(e=>false)}
+function saveTableData(d){return dbPut('main',d)}
+function loadTableData(){return dbGet('main')}
+function deleteTableData(){return dbDelete('main')}
+function saveLogToDB(){return dbPut('log',checkLog.slice(-5000))}
+function loadLogFromDB(){return dbGet('log').then(v=>Array.isArray(v)?v:[])}
+function deleteLogFromDB(){return dbDelete('log')}
+function saveMatched(){try{localStorage.setItem(KEY_MATCHED_CELLS,JSON.stringify(Array.from(matchedCells)))}catch(e){}}
+function loadMatchedCells(){try{const s=localStorage.getItem(KEY_MATCHED_CELLS);return s?JSON.parse(s):[]}catch(e){return[]}}
+function clearMatched(){try{localStorage.removeItem(KEY_MATCHED_CELLS);localStorage.removeItem(KEY_MATCHED_OLD)}catch(e){}}
+function rebuildMatchedSetFromCells(){matchedSet=new Set();matchedCells.forEach(k=>{const r=parseInt(String(k).split("-")[0],10);if(!isNaN(r))matchedSet.add(r)});lastHitRow=matchedSet.size?Math.max.apply(null,Array.from(matchedSet)):-1}
+
+/* 振动、音频 */
+function vibrate(t){if(!navigator.vibrate)return;try{if(t==='ok')navigator.vibrate(60);else if(t==='dup')navigator.vibrate([80,60,80]);else if(t==='miss')navigator.vibrate([300,100,300,100,300])}catch(e){}}
+let audioCtx=null;
+function ensureCtx(){if(!audioCtx){const AC=window.AudioContext||window.webkitAudioContext;if(AC)audioCtx=new AC()}return audioCtx}
+function playTone(ctx,freq,dur,vol,st){try{const o=ctx.createOscillator(),g=ctx.createGain();o.type='sine';o.frequency.value=freq;o.connect(g);g.connect(ctx.destination);const v=Math.min(vol,1);g.gain.setValueAtTime(v,st);g.gain.exponentialRampToValueAtTime(0.001,st+dur/1000);o.start(st);o.stop(st+dur/1000)}catch(e){}}
+function initAudioAndUnlock(){const ctx=ensureCtx();if(!ctx)return;const fire=()=>{playTone(ctx,1500,130,1,ctx.currentTime)};if(ctx.state==='suspended'){ctx.resume().then(fire).catch(fire)}else{fire()}}
+function playBeep(t){const ctx=ensureCtx();if(!ctx)return;const fire=()=>{const now=ctx.currentTime;if(t==='ok'){playTone(ctx,1500,120,1,now);playTone(ctx,2000,130,1,now+0.14)}else if(t==='dup'){playTone(ctx,1000,60,1,now);playTone(ctx,1000,60,1,now+0.1);playTone(ctx,1000,60,1,now+0.2)}else if(t==='miss'){playTone(ctx,400,500,1,now)}};if(ctx.state==='suspended'){ctx.resume().then(fire).catch(fire)}else{fire()}}
+function speak(text){try{if(!window.speechSynthesis)return;speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.lang="zh-CN";u.rate=1.15;u.volume=1;speechSynthesis.speak(u)}catch(e){}}
+
+/* UI */
+function toast(head,info,ms){const t=$("toast");let h='<div class="head">'+head+'</div>';if(info)h+='<span class="info">'+info+'</span>';t.innerHTML=h;t.style.display="block";clearTimeout(t._tm);t._tm=setTimeout(()=>t.style.display="none",ms||2600)}
+function logMsg(cls,msg){const d=document.createElement("div");d.className=cls;d.textContent=msg;$("log").prepend(d);$("logCard").style.display="block"}
+function popup(title,bodyHtml){$("modalTitle").textContent=title;$("modalBody").innerHTML=bodyHtml;$("modalMask").classList.add("show")}
+$("modalOk").onclick=()=>$("modalMask").classList.remove("show");
+$("modalMask").onclick=e=>{if(e.target===$("modalMask"))$("modalMask").classList.remove("show")};
+function hasGetUserMedia(){return!!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia)}
+function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}
+function modeText(idx){if(idx===-1)return"全部列（核对整表所有单元格）";if(idx===null||idx===undefined)return"";return headers[idx]||("第"+(idx+1)+"列")}
+
+function pickColumn(currentIdx,callback){const mask=$("colPickerMask"),list=$("colPickerList");list.innerHTML="";
+const allBtn=document.createElement("button");allBtn.className="colPickBtn allBtn"+(currentIdx===-1?" current":"");allBtn.innerHTML='<span class="idx">ALL</span>全部列（核对整表所有单元格）';allBtn.onclick=()=>{mask.classList.remove("show");callback(-1)};list.appendChild(allBtn);
+headers.forEach((h,i)=>{const btn=document.createElement("button");btn.className="colPickBtn"+(i===currentIdx?" current":"");btn.innerHTML='<span class="idx">第'+(i+1)+'列</span>'+esc(h||"(空标题)");btn.onclick=()=>{mask.classList.remove("show");callback(i)};list.appendChild(btn)});
+mask.classList.add("show")}
+
+/* 上传 */
+$("btnUpload").onclick=()=>{if(hasSavedData){if(!confirm("检测到上次保存的核对数据。\n\n上传新表格会覆盖旧数据，是否继续？\n\n（如果想保留旧数据，点取消）"))return}pickFile()};
+function pickFile(){const inp=document.createElement("input");inp.type="file";inp.accept=".xlsx,.xls,.csv";inp.onchange=async e=>{const f=e.target.files[0];if(!f)return;$("fileName").textContent=f.name;fileBase=f.name.replace(/\.[^.]+$/,"");$("uploadBusy").style.display="inline";$("btnUpload").disabled=true;
+try{if(typeof XLSX==="undefined")throw new Error("XLSX 组件未加载，请检查网络后重试");
+const buf=await f.arrayBuffer();const wb=XLSX.read(buf,{type:"array"});sheetName=wb.SheetNames[0];const ws=wb.Sheets[sheetName];const arr=XLSX.utils.sheet_to_json(ws,{header:1,defval:"",raw:true});
+if(!arr.length){toast("提示","表格为空");return}
+headers=arr[0].map(h=>String(h).trim());rows=arr.slice(1).filter(r=>r.some(c=>String(c).trim()!==""));
+if(!headers.length){toast("提示","表格没有表头");return}
+$("uploadBusy").style.display="none";$("btnUpload").disabled=false;
+pickColumn(null,function(idx){matchColIdx=idx;$("colBadge").style.display="inline";$("colBadge").textContent="核对模式："+modeText(idx);
+matchedSet=new Set();matchedCells=new Set();lastHitRow=-1;clearMatched();buildIndex();renderTable();updateStats();
+$("restoreBanner").style.display="none";showDataButtons(true);$("statCard").style.display="block";$("tableCard").style.display="block";$("btnCamera").style.display="";$("btnStop").style.display="none";
+toast("已读取 "+rows.length+" 行数据","正在后台保存进度…");
+saveTableData({headers:headers,rows:rows,matchColIdx:matchColIdx,sheetName:sheetName,fileBase:fileBase,savedAt:Date.now()}).then(ok=>{hasSavedData=ok;if(ok)toast("核对模式："+modeText(idx),"✅ 进度已保存，可放心关闭");else toast("核对模式："+modeText(idx),"⚠️ 进度保存失败，请勿关闭页面")})})}
+catch(err){console.error(err);toast("读取失败",String(err&&err.message||err));$("uploadBusy").style.display="none";$("btnUpload").disabled=false}};inp.click()}
+
+$("btnChangeCol").onclick=()=>{if(!headers.length)return;pickColumn(matchColIdx,function(idx){matchColIdx=idx;$("colBadge").style.display="inline";$("colBadge").textContent="核对模式："+modeText(idx);buildIndex();renderTable();updateStats();
+saveTableData({headers:headers,rows:rows,matchColIdx:matchColIdx,sheetName:sheetName,fileBase:fileBase,savedAt:Date.now()});toast("已切换核对模式",modeText(idx))})};
+
+function buildIndex(){codeIndex=new Map();if(matchColIdx===null||matchColIdx===undefined)return;
+if(matchColIdx===-1){rows.forEach((r,i)=>{r.forEach((val,j)=>{const k=String(val??"").trim();if(!k)return;if(!codeIndex.has(k))codeIndex.set(k,[]);codeIndex.get(k).push({r:i,c:j})})})}
+else{rows.forEach((r,i)=>{const k=String(r[matchColIdx]??"").trim();if(!k)return;if(!codeIndex.has(k))codeIndex.set(k,[]);codeIndex.get(k).push({r:i,c:matchColIdx})})}}
+
+function renderTable(){let html="<tr>"+headers.map(h=>"<th>"+esc(h)+"</th>").join("")+"</tr>";
+rows.forEach((r,i)=>{html+="<tr data-i='"+i+"'>";headers.forEach((_,j)=>{const isMatched=matchedCells.has(i+"-"+j);html+="<td"+(isMatched?" class='matched'":"")+">"+esc(String(r[j]??""))+"</td>"});html+="</tr>"});
+$("grid").innerHTML=html}
+function updateStats(){$("statCard").style.display="block";$("stTotal").textContent=rows.length;$("stDone").textContent=matchedSet.size;$("stLeft").textContent=rows.length-matchedSet.size}
+function getRowInfo(rowIndex){const rowData=rows[rowIndex]||[];const parts=[];rowData.forEach((val,idx)=>{const s=String(val).trim();if(s){const h=headers[idx]?headers[idx]:("列"+(idx+1));parts.push(h+"："+s)}});return parts.join(" | ")}
+
+$("btnLocate").onclick=()=>{if(lastHitRow<0){toast("提示","还没有成功核对任何项目");return}const wrap=document.querySelector(".table-wrap");const tr=document.querySelector("tr[data-i='"+lastHitRow+"']");if(wrap&&tr){wrap.scrollTop=tr.offsetTop-wrap.clientHeight/2+tr.clientHeight/2;toast("已定位","已滚动到最新核对行")}};
+
+function addLog(code,result,info){const d=new Date();const timeStr=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,'0')+"-"+String(d.getDate()).padStart(2,'0')+" "+String(d.getHours()).padStart(2,'0')+":"+String(d.getMinutes()).padStart(2,'0')+":"+String(d.getSeconds()).padStart(2,'0');checkLog.push({time:timeStr,code:code,result:result,info:info||""});saveLogToDB()}
+
+function markMatched(r,c,code,source){if(matchedCells.has(r+"-"+c))return false;
+matchedCells.add(r+"-"+c);matchedSet.add(r);lastHitRow=r;
+const src=source?"（"+source+"）":"";
+logMsg("ok",new Date().toLocaleTimeString()+" ✅ 匹配成功："+code+src);
+renderTable();updateStats();saveMatched();
+const info=getRowInfo(r)+" ｜ 命中列："+(headers[c]||("列"+(c+1)));
+addLog(code,"成功",info+src);
+playBeep('ok');vibrate('ok');speak("可以配送");
+toast("✅ 已核对 · 可以配送",info);
+if(matchedSet.size===rows.length&&rows.length)speak("核对完成");
+return true}
+
+/* 精确匹配（摄像头） */
+function check(code){code=String(code||"").trim();if(!code)return;
+if(matchColIdx===null||matchColIdx===undefined){toast("提示","请先选择核对模式");return}
+const positions=codeIndex.get(code);let hit=null,dup=false;
+if(positions){for(const p of positions){if(!matchedCells.has(p.r+"-"+p.c)){hit=p;break}}if(!hit)dup=true}
+const ts=new Date().toLocaleTimeString();
+if(hit){markMatched(hit.r,hit.c,code,"")}
+else if(dup){logMsg("dup",ts+" ⚠️ 重复扫描："+code);addLog(code,"重复","该条码已核对过");playBeep('dup');vibrate('dup');speak("重复扫描");toast("⚠️ 重复扫描","该条码已核对过："+code)}
+else{logMsg("miss",ts+" ❌ 未在表格中找到："+code);addLog(code,"失败","未在表格中找到");playBeep('miss');vibrate('miss');speak("不可配送，需滞留");toast("❌ 不可配送，需滞留","未在表格中找到："+code)}}
+
+/* 模糊匹配（语音） */
+function basicNormalize(s){if(!s)return"";let r=String(s);
+r=r.replace(/[\uFF01-\uFF5E]/g,ch=>String.fromCharCode(ch.charCodeAt(0)-0xFEE0));
+r=r.replace(/[\s\u3000]+/g,"");
+r=r.replace(/[,，.。、;；:：\-_\/\\|'"`~!@#$%^&*()\[\]{}<>?·。！？；：""''（）【】《》…]/g,"");
+const cnMap={'零':'0','〇':'0','○':'0','洞':'0','一':'1','壹':'1','幺':'1','二':'2','贰':'2','两':'2','三':'3','叁':'3','四':'4','肆':'4','五':'5','伍':'5','六':'6','陆':'6','七':'7','柒':'7','拐':'7','八':'8','捌':'8','九':'9','玖':'9','勾':'9'};
+let out="";for(let i=0;i<r.length;i++){const ch=r[i];out+=(cnMap[ch]!==undefined)?cnMap[ch]:ch}r=out;
+r=r.toUpperCase();return r}
+
+function levenshteinDistance(a,b){if(a.length===0)return b.length;if(b.length===0)return a.length;
+const m=a.length,n=b.length;let prev=new Array(n+1),curr=new Array(n+1);
+for(let j=0;j<=n;j++)prev[j]=j;
+for(let i=1;i<=m;i++){curr[0]=i;for(let j=1;j<=n;j++){const cost=a[i-1]===b[j-1]?0:1;curr[j]=Math.min(prev[j]+1,curr[j-1]+1,prev[j-1]+cost)}const tmp=prev;prev=curr;curr=tmp}
+return prev[n]}
+function calcSimilarity(a,b){if(!a&&!b)return 1;if(!a||!b)return 0;const maxLen=Math.max(a.length,b.length);return 1-levenshteinDistance(a,b)/maxLen}
+
+function fuzzyFindCandidates(input){const inputNorm=basicNormalize(input);if(!inputNorm)return[];
+const candidates=[];
+function evalCell(r,c,text){if(matchedCells.has(r+"-"+c))return;const t=String(text??"").trim();if(!t)return;const tNorm=basicNormalize(t);if(!tNorm)return;
+let score=calcSimilarity(inputNorm,tNorm);
+if(tNorm.includes(inputNorm)){score=Math.max(score,0.85+0.15*(inputNorm.length/tNorm.length))}
+else if(inputNorm.includes(tNorm)){score=Math.max(score,0.85+0.15*(tNorm.length/inputNorm.length))}
+if(score>=0.5)candidates.push({r:r,c:c,text:t,score:score})}
+if(matchColIdx===-1){rows.forEach((row,i)=>{row.forEach((val,j)=>{evalCell(i,j,val)})})}
+else if(matchColIdx>=0){rows.forEach((row,i)=>{evalCell(i,matchColIdx,row[matchColIdx])})}
+candidates.sort((a,b)=>b.score-a.score);return candidates.slice(0,5)}
+
+/* 语音识别 */
+let voiceRec=null,voiceRawText="",voiceNormalizedText="",voiceSilenceTimer=null,voiceActive=false;
+function getSpeechRecognitionClass(){return window.SpeechRecognition||window.webkitSpeechRecognition||null}
+function startVoiceRecognition(){const SR=getSpeechRecognitionClass();
+if(!SR){popup("不支持语音识别","当前浏览器不支持网页语音识别。<br><br>建议使用：<br>• Android Chrome / Edge<br>• iOS Safari 14.5+<br>• 桌面 Chrome / Edge<br><br>微信内置浏览器不支持，请用系统浏览器打开。");return}
+voiceRawText="";voiceNormalizedText="";voiceActive=true;
+$("voiceRawText").textContent="（等待语音…）";$("voiceNormalizedText").textContent="—";$("voiceStatus").textContent="🎤 正在聆听… 请读出条码";$("voiceConfirmBtn").disabled=true;$("voiceMask").classList.add("show");
+try{voiceRec=new SR();voiceRec.lang='zh-CN';voiceRec.continuous=true;voiceRec.interimResults=true;voiceRec.maxAlternatives=1;
+voiceRec.onresult=(e)=>{let interim="";for(let i=e.resultIndex;i<e.results.length;i++){const t=e.results[i][0].transcript;if(e.results[i].isFinal){voiceRawText+=t}else{interim+=t}}
+const displayRaw=voiceRawText+interim;const norm=basicNormalize(displayRaw);
+$("voiceRawText").textContent=displayRaw||"（等待语音…）";$("voiceNormalizedText").textContent=norm||"—";if(norm)$("voiceConfirmBtn").disabled=false;
+clearTimeout(voiceSilenceTimer);voiceSilenceTimer=setTimeout(()=>{try{voiceRec.stop()}catch(e){}},1500)};
+voiceRec.onerror=(e)=>{console.warn("[语音] 错误:",e.error);
+if(e.error==='not-allowed'||e.error==='service-not-allowed'){$("voiceStatus").textContent="❌ 麦克风权限被拒绝，请在浏览器设置中允许"}
+else if(e.error==='no-speech'){$("voiceStatus").textContent="❌ 没有检测到语音，请点「重说」"}
+else if(e.error==='network'){$("voiceStatus").textContent="❌ 网络错误，请检查网络后重试"}
+else{$("voiceStatus").textContent="❌ 识别出错："+e.error}
+voiceActive=false};
+voiceRec.onend=()=>{voiceActive=false;clearTimeout(voiceSilenceTimer);const norm=basicNormalize(voiceRawText);voiceNormalizedText=norm;
+if(norm){$("voiceStatus").textContent="✅ 识别完成，请点「查找匹配」";$("voiceConfirmBtn").disabled=false}
+else{$("voiceStatus").textContent="⚠️ 没有识别到内容，请点「重说」";$("voiceConfirmBtn").disabled=true}};
+voiceRec.start()}catch(err){console.error("[语音] 启动失败:",err);$("voiceStatus").textContent="❌ 无法启动语音识别："+(err.message||err);voiceActive=false}}
+
+function stopVoiceRecognition(){clearTimeout(voiceSilenceTimer);voiceSilenceTimer=null;if(voiceRec){try{voiceRec.stop()}catch(e){}try{voiceRec.abort()}catch(e){}voiceRec=null}voiceActive=false}
+function closeVoicePanel(){stopVoiceRecognition();$("voiceMask").classList.remove("show")}
+
+$("btnVoice").onclick=()=>{initAudioAndUnlock();startVoiceRecognition()};
+$("voiceCancelBtn").onclick=()=>{closeVoicePanel()};
+$("voiceRetryBtn").onclick=()=>{stopVoiceRecognition();setTimeout(()=>startVoiceRecognition(),200)};
+$("voiceConfirmBtn").onclick=()=>{const raw=(voiceRawText||"").trim();if(!raw){toast("提示","没有可提交的内容");return}closeVoicePanel();showFuzzyMatch(raw)};
+document.addEventListener("visibilitychange",function(){if(document.hidden&&voiceActive){closeVoicePanel()}});
+
+/* 模糊匹配弹窗 */
+let fuzzyCandidates=[],fuzzySelectedIdx=-1;
+function showFuzzyMatch(input){const candidates=fuzzyFindCandidates(input);fuzzyCandidates=candidates;fuzzySelectedIdx=candidates.length>0?0:-1;
+$("fuzzyInput").textContent=input;const list=$("fuzzyList");list.innerHTML="";
+if(candidates.length===0){list.style.display="none";$("fuzzyEmpty").style.display="block";$("fuzzyConfirmBtn").disabled=true}
+else{list.style.display="block";$("fuzzyEmpty").style.display="none";$("fuzzyConfirmBtn").disabled=false;
+candidates.forEach((cand,idx)=>{const btn=document.createElement("button");btn.className="fuzzyItem"+(idx===0?" selected":"");
+const pct=Math.round(cand.score*100);const scoreCls=pct>=80?"score-high":"score-mid";
+const rowInfo="第 "+(cand.r+1)+" 行 · "+(headers[cand.c]||("列"+(cand.c+1)));
+btn.innerHTML='<div class="fuzzyItemText">'+esc(cand.text)+'</div><div class="fuzzyItemMeta">'+esc(rowInfo)+' · 相似度 <span class="'+scoreCls+'">'+pct+'%</span></div>';
+btn.onclick=()=>{fuzzySelectedIdx=idx;list.querySelectorAll(".fuzzyItem").forEach(el=>el.classList.remove("selected"));btn.classList.add("selected")};
+list.appendChild(btn)})}
+$("fuzzyMask").classList.add("show")}
+$("fuzzyCancelBtn").onclick=()=>{$("fuzzyMask").classList.remove("show")};
+$("fuzzyRetryBtn").onclick=()=>{$("fuzzyMask").classList.remove("show");setTimeout(()=>startVoiceRecognition(),200)};
+$("fuzzyConfirmBtn").onclick=()=>{if(fuzzySelectedIdx<0||!fuzzyCandidates[fuzzySelectedIdx]){toast("提示","请先选择一个匹配项");return}
+const sel=fuzzyCandidates[fuzzySelectedIdx];$("fuzzyMask").classList.remove("show");markMatched(sel.r,sel.c,sel.text,"语音模糊匹配")};
+
+/* 摄像头 */
+function showCamStatus(track){const el=$("camStatus");if(!el||!track)return;const caps=(track.getCapabilities?track.getCapabilities():{})||{};const parts=[];
+if(Array.isArray(caps.focusMode)&&caps.focusMode.length){const f=caps.focusMode;if(f.includes('continuous'))parts.push('自动对焦✓');else if(f.includes('single-shot'))parts.push('单次对焦');else parts.push('对焦: '+f.join('/'))}else{parts.push('对焦: 不支持')}
+if(caps.zoom&&caps.zoom.max>caps.zoom.min){parts.push('变焦 '+caps.zoom.min.toFixed(1)+'-'+caps.zoom.max.toFixed(1))}
+el.textContent=parts.join(' | ');el.style.display="block"}
+
+async function applyManualFocus(track,value){if(!track)return;try{const settings=track.getSettings();await track.applyConstraints({width:settings.width||{ideal:1920},height:settings.height||{ideal:1080},advanced:[{focusMode:'manual',focusDistance:value}]})}catch(e){}}
+async function applyZoomBump(track,delta){if(!track)return;try{const caps=track.getCapabilities();const settings=track.getSettings();let currentZoom=settings.zoom||(caps.zoom?caps.zoom.min:1);let targetZoom=currentZoom+delta;if(caps.zoom){targetZoom=Math.max(caps.zoom.min,Math.min(caps.zoom.max,targetZoom))}
+await track.applyConstraints({width:settings.width||{ideal:1920},height:settings.height||{ideal:1080},zoom:targetZoom});
+if($("zoomSlider").style.display!=="none"){$("zoomSlider").value=targetZoom}}catch(e){}}
+
+async function tryFocusAtPoint(track,x,y){if(!track)return false;const caps=(track.getCapabilities?track.getCapabilities():{})||{};const settings=track.getSettings();const baseConstraints={width:settings.width||{ideal:1920},height:settings.height||{ideal:1080}};
+if(Array.isArray(caps.focusMode)&&caps.focusMode.includes('continuous')){try{await track.applyConstraints(Object.assign({},baseConstraints,{advanced:[{focusMode:'continuous'}]}));return true}catch(e){}}
+if(Array.isArray(caps.focusMode)&&caps.focusMode.includes('single-shot')){try{await track.applyConstraints(Object.assign({},baseConstraints,{advanced:[{focusMode:'single-shot'}]}));setTimeout(()=>{if(Array.isArray(caps.focusMode)&&caps.focusMode.includes('continuous')){try{track.applyConstraints({advanced:[{focusMode:'continuous'}]})}catch(e){}}},2000);return true}catch(e){}}
+if(caps.zoom&&caps.zoom.max>caps.zoom.min){try{const currentZoom=track.getSettings().zoom||caps.zoom.min;const bump=Math.min(caps.zoom.max,currentZoom+0.1);await track.applyConstraints({zoom:bump});setTimeout(()=>{try{track.applyConstraints({zoom:currentZoom})}catch(e){}},200);return true}catch(e){}}
+return false}
+
+function showFocusRing(clientX,clientY,rect){const ring=$("focusRing");if(!ring)return;const px=clientX-rect.left;const py=clientY-rect.top;ring.style.left=px+'px';ring.style.top=py+'px';ring.classList.remove('active');void ring.offsetWidth;ring.classList.add('active');setTimeout(()=>ring.classList.remove('active'),950)}
+
+let camStream=null,camTrack=null,camVideo=null,nativeDetector=null,scanning=false,starting=false,scanTimer=null,loopBusy=false,scanner=null,fallbackMode=false,lastCode="",lastCodeTime=0;
+
+function emitCode(code){code=String(code||"").trim();if(!code)return;const now=Date.now();if(code===lastCode&&now-lastCodeTime<2000)return;lastCode=code;lastCodeTime=now;check(code)}
+
+const WANTED_FORMATS=["ean_13","ean_8","upc_a","upc_e","code_128","code_39","code_93","itf","codabar","qr_code"];
+async function makeDetector(){if(!("BarcodeDetector" in window))return null;try{const sup=await BarcodeDetector.getSupportedFormats();const formats=WANTED_FORMATS.filter(f=>sup.includes(f));if(formats.length)return new BarcodeDetector({formats})}catch(e){}return null}
+
+async function openCameraWithBestConstraints(){const base={facingMode:{ideal:"environment"}};
+if(IS_IOS){const iosTries=[{audio:false,video:Object.assign({},base,{width:{ideal:1280},height:{ideal:720}})},{audio:false,video:Object.assign({},base,{width:{ideal:640},height:{ideal:480}})},{audio:false,video:base}];
+let lastErr=null;for(let i=0;i<iosTries.length;i++){try{const s=await navigator.mediaDevices.getUserMedia(iosTries[i]);return s}catch(e){lastErr=e}}throw lastErr||new Error("无法打开摄像头")}
+const ptzRequest={zoom:true};const advancedFocus=[{focusMode:"continuous"},{exposureMode:"continuous"},{whiteBalanceMode:"continuous"}];
+const tries=[{audio:false,video:Object.assign({},base,{width:{ideal:1920},height:{ideal:1080},frameRate:{ideal:30},advanced:advancedFocus.concat([ptzRequest])})},{audio:false,video:Object.assign({},base,{width:{ideal:1280},height:{ideal:720},frameRate:{ideal:30},advanced:advancedFocus.concat([ptzRequest])})},{audio:false,video:Object.assign({},base,{width:{ideal:1280},height:{ideal:720}})},{audio:false,video:Object.assign({},base,{width:{ideal:640},height:{ideal:480}})},{audio:false,video:base}];
+let stream=null,lastErr=null;for(let i=0;i<tries.length;i++){try{stream=await navigator.mediaDevices.getUserMedia(tries[i]);return stream}catch(e){lastErr=e}}throw lastErr||new Error("无法打开摄像头")}
+
+async function tuneTrackAfterStart(track){if(!track)return;if(IS_IOS)return;
+try{const caps=(track.getCapabilities?track.getCapabilities():{})||{};
+if(Array.isArray(caps.focusMode)&&caps.focusMode.includes("continuous")){try{await track.applyConstraints({advanced:[{focusMode:"continuous"}]})}catch(e){}}
+else if(Array.isArray(caps.focusMode)&&caps.focusMode.length){try{await track.applyConstraints({advanced:[{focusMode:"single-shot"}]})}catch(e){}if(window._focusInterval)clearInterval(window._focusInterval);window._focusInterval=setInterval(()=>{try{track.applyConstraints({advanced:[{focusMode:"single-shot"}]})}catch(e){}},1500)}
+if(Array.isArray(caps.exposureMode)&&caps.exposureMode.includes("continuous")){try{await track.applyConstraints({advanced:[{exposureMode:"continuous"}]})}catch(e){}}}catch(e){}}
+
+async function startNativeScan(){const det=await makeDetector();if(!det)throw new Error("no-native-detector");
+const container=$("reader");const oldVideo=container.querySelector("video");if(oldVideo)container.removeChild(oldVideo);const oldOverlay=container.querySelector(".scan-frame");if(oldOverlay)container.removeChild(oldOverlay);
+const video=document.createElement("video");video.setAttribute("playsinline","");video.setAttribute("muted","");video.autoplay=true;video.muted=true;container.insertBefore(video,container.firstChild);
+const overlay=document.createElement("div");overlay.className="scan-frame";container.appendChild(overlay);
+const stream=await openCameraWithBestConstraints();video.srcObject=stream;camStream=stream;camTrack=stream.getVideoTracks()[0];await video.play();
+await tuneTrackAfterStart(camTrack);showCamStatus(camTrack);$("camTip").style.display="block";
+const zoomSlider=$("zoomSlider"),zoomRow=$("zoomRow"),focusDistanceSlider=$("focusDistanceSlider"),focusDistanceRow=$("focusDistanceRow"),focusStepRow=$("focusStepRow"),controlPanel=$("controlPanel");
+const caps=camTrack.getCapabilities?camTrack.getCapabilities():{};let hasAnyControl=false;
+const browserSupportsZoom=navigator.mediaDevices.getSupportedConstraints().zoom;const deviceSupportsZoom=caps.zoom&&caps.zoom.max>caps.zoom.min;
+if(browserSupportsZoom&&deviceSupportsZoom){zoomSlider.min=caps.zoom.min;zoomSlider.max=caps.zoom.max;zoomSlider.step=(caps.zoom.max-caps.zoom.min)/20;zoomSlider.value=camTrack.getSettings().zoom||caps.zoom.min;zoomRow.style.display="flex";hasAnyControl=true;
+zoomSlider.oninput=async(e)=>{const val=parseFloat(e.target.value);try{await camTrack.applyConstraints({zoom:val})}catch(err){}}}else{zoomRow.style.display="none"}
+if(caps.focusDistance&&caps.focusDistance.max>caps.focusDistance.min){focusDistanceSlider.min=caps.focusDistance.min;focusDistanceSlider.max=caps.focusDistance.max;focusDistanceSlider.step=caps.focusDistance.step||0.01;let defaultVal=(caps.focusDistance.min+caps.focusDistance.max)/2;focusDistanceSlider.value=defaultVal;focusDistanceRow.style.display="flex";hasAnyControl=true;
+focusDistanceSlider.oninput=async(e)=>{const val=parseFloat(e.target.value);await applyManualFocus(camTrack,val)}}else{focusDistanceRow.style.display="none"}
+if(!caps.focusDistance||caps.focusDistance.max<=caps.focusDistance.min){focusStepRow.style.display="flex";hasAnyControl=true;$("btnFocusMinus").onclick=()=>applyZoomBump(camTrack,-0.2);$("btnFocusPlus").onclick=()=>applyZoomBump(camTrack,0.2)}else{focusStepRow.style.display="none"}
+if(hasAnyControl){controlPanel.style.display="flex"}else{controlPanel.style.display="none"}
+video.addEventListener("click",async ev=>{const rect=video.getBoundingClientRect();showFocusRing(ev.clientX,ev.clientY,rect);const x=(ev.clientX-rect.left)/rect.width;const y=(ev.clientY-rect.top)/rect.height;const ok=await tryFocusAtPoint(camTrack,x,y);if(!ok){toast("提示","当前设备或浏览器不支持网页手动对焦，请使用底部控制面板微调")}});
+nativeDetector=det;camVideo=video;scanning=true;scanLoop();return true}
+
+async function scanLoop(){if(!scanning||!nativeDetector||!camVideo)return;if(!loopBusy&&camVideo.readyState>=2&&camVideo.videoWidth>0){loopBusy=true;try{const codes=await nativeDetector.detect(camVideo);if(codes&&codes.length){for(const c of codes){if(c.rawValue)emitCode(c.rawValue)}}}catch(e){}loopBusy=false}scanTimer=setTimeout(scanLoop,80)}
+
+async function startFallbackScan(){if(typeof Html5Qrcode==="undefined")throw new Error("扫码库未加载");fallbackMode=true;const el=$("reader");el.innerHTML="";scanner=new Html5Qrcode("reader",false);
+await scanner.start({facingMode:"environment"},{fps:15,qrbox:{width:280,height:160},experimentalFeatures:{useBarCodeDetectorIfSupported:true}},code=>emitCode(code),()=>{});
+await boostStreamResolution();scanning=true}
+
+async function boostStreamResolution(){const v=$("reader").querySelector("video");if(!v||!v.srcObject)return;const t=v.srcObject.getVideoTracks()[0];if(!t)return;await tuneTrackAfterStart(t)}
+
+function stopCamStream(){if(window._focusInterval){clearInterval(window._focusInterval);window._focusInterval=null}if(camStream){try{camStream.getTracks().forEach(t=>t.stop())}catch(e){}}
+camStream=null;camTrack=null;if(camVideo){try{camVideo.pause()}catch(e){}try{camVideo.srcObject=null}catch(e){}}camVideo=null;nativeDetector=null}
+
+function forceRestoreCameraUI(){try{$("readerWrap").style.display="none"}catch(e){}try{$("camTip").style.display="none"}catch(e){}try{$("camStatus").style.display="none"}catch(e){}try{$("controlPanel").style.display="none"}catch(e){}try{$("btnCamera").style.display=""}catch(e){}try{$("btnStop").style.display="none"}catch(e){}try{$("btnCamera").disabled=false}catch(e){}}
+
+function stopScan(){forceRestoreCameraUI();scanning=false;starting=false;
+if(scanTimer){clearTimeout(scanTimer);scanTimer=null}if(window._focusInterval){clearInterval(window._focusInterval);window._focusInterval=null}
+const oldStream=camStream,oldVideo=camVideo,oldScanner=scanner,wasFallback=fallbackMode;
+camStream=null;camTrack=null;camVideo=null;nativeDetector=null;scanner=null;fallbackMode=false;
+try{const readerEl=$("reader");readerEl.querySelectorAll("video").forEach(v=>{try{v.pause()}catch(e){}try{v.srcObject=null}catch(e){}try{if(v.parentNode)v.parentNode.removeChild(v)}catch(e){}})}catch(e){}
+setTimeout(function(){try{if(oldStream){oldStream.getTracks().forEach(t=>{try{t.stop()}catch(e){}})}}catch(e){}
+if(oldVideo){try{oldVideo.pause()}catch(e){}try{oldVideo.srcObject=null}catch(e){}}
+if(wasFallback&&oldScanner){try{const p=oldScanner.stop();if(p&&typeof p.then==="function"){p.then(()=>{try{oldScanner.clear()}catch(e){}}).catch(()=>{try{oldScanner.clear()}catch(e){}})}else{try{oldScanner.clear()}catch(e){}}}catch(e){try{oldScanner.clear()}catch(e){}}}},30);
+setTimeout(function(){try{if(!scanning&&!starting){const camBtn=$("btnCamera"),stopBtn=$("btnStop");if(camBtn&&camBtn.style.display==="none"&&stopBtn&&stopBtn.style.display!=="none"){forceRestoreCameraUI()}}}catch(e){}},800)}
+
+function cameraErrText(e){const name=(e&&e.name)||"";const raw=(e&&e.message)?e.message:String(e||"");
+switch(name){case "NotAllowedError":return "摄像头权限被拒绝。\n\n请点击浏览器地址栏左侧的 🔒 图标，把摄像头改为「允许」，刷新重试。";case "NotFoundError":return "没有检测到摄像头设备。";case "NotReadableError":return "摄像头被占用。请关闭其他使用相机的程序后重试。";case "OverconstrainedError":return "手机不支持这么高的分辨率。";default:return "错误类型："+(name||"未知")+"\n"+raw}}
+
+$("btnCamera").onclick=async()=>{if(scanning||starting)return;initAudioAndUnlock();
+if(!hasGetUserMedia()){popup("不支持摄像头","请使用 Chrome 或系统自带浏览器打开，不要用微信内置浏览器。");return}
+starting=true;$("btnCamera").disabled=true;$("readerWrap").style.display="block";
+try{let ok=false;
+if("BarcodeDetector" in window&&!IS_IOS){try{ok=await startNativeScan()}catch(e){stopCamStream();const readerEl=$("reader");while(readerEl.firstChild)readerEl.removeChild(readerEl.firstChild)}}
+if(!ok){await startFallbackScan()}
+scanning=true;$("btnCamera").style.display="none";$("btnStop").style.display=""}
+catch(e){console.error("启动扫描失败：",e);stopScan();popup("无法开启相机",cameraErrText(e))}
+finally{starting=false;$("btnCamera").disabled=false}};
+
+$("btnStop").onclick=function(){stopScan()};
+
+/* 导出 */
+function getTodayStr(){const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,'0')+"-"+String(d.getDate()).padStart(2,'0')}
+async function buildAndShareExcel(rowIdxList,outBaseName){if(typeof ExcelJS==="undefined"){toast("导出组件未加载完成","请稍后再试");return}if(!rowIdxList.length){toast("提示","没有可导出的数据");return}
+try{const wb=new ExcelJS.Workbook();const ws=wb.addWorksheet(sheetName||"核对结果");ws.addRow(headers).font={bold:true};
+rowIdxList.forEach(i=>{const r=rows[i]||[];const row=ws.addRow(headers.map((_,j)=>r[j]??""));
+headers.forEach((_,j)=>{if(matchedCells.has(i+"-"+j)){const cell=row.getCell(j+1);cell.fill={type:"pattern",pattern:"solid",fgColor:{argb:"FFFFC7CE"}};cell.font={color:{argb:"FF9C0006"},bold:true}}})});
+headers.forEach((h,j)=>{ws.getColumn(j+1).width=Math.max(12,String(h).length*2+6)});
+const buf=await wb.xlsx.writeBuffer();const outName=outBaseName+".xlsx";$("exportName").textContent="已生成："+outName;
+const blob=new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});const file=new File([blob],outName,{type:blob.type});
+if(navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file],title:outBaseName});return}catch(e){if(e.name==="AbortError")return}}
+const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=outName;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),5000);toast("已下载",outName)}
+catch(err){toast("导出失败",err.message)}}
+
+$("btnExport").onclick=()=>{if(!rows.length)return;buildAndShareExcel(rows.map((_,i)=>i),getTodayStr())};
+$("btnExportMatched").onclick=()=>{if(!rows.length)return;if(matchedSet.size===0){toast("提示","还没有已核对的行可导出");return}const idxList=Array.from(matchedSet).sort((a,b)=>a-b);buildAndShareExcel(idxList,getTodayStr()+"已配送的明细")};
+$("btnExportLog").onclick=async()=>{if(typeof ExcelJS==="undefined"){toast("导出组件未加载完成","请稍后再试");return}if(!checkLog.length){toast("提示","还没有运行日志可导出");return}
+try{const wb=new ExcelJS.Workbook();const ws=wb.addWorksheet("核对日志");const headerRow=ws.addRow(["序号","时间","条码","核对结果","详细信息"]);headerRow.font={bold:true};
+checkLog.forEach((item,idx)=>{const row=ws.addRow([idx+1,item.time,item.code,item.result,item.info||""]);
+if(item.result==="成功")row.getCell(4).font={color:{argb:"FF198754"},bold:true};else if(item.result==="失败")row.getCell(4).font={color:{argb:"FFDC3545"},bold:true};else if(item.result==="重复")row.getCell(4).font={color:{argb:"FFFD7E14"},bold:true}});
+ws.getColumn(1).width=8;ws.getColumn(2).width=22;ws.getColumn(3).width=25;ws.getColumn(4).width=12;ws.getColumn(5).width=60;
+const buf=await wb.xlsx.writeBuffer();const outName=getTodayStr()+"核对日志.xlsx";$("exportName").textContent="已生成："+outName;
+const blob=new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});const file=new File([blob],outName,{type:blob.type});
+if(navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file],title:"核对日志"});return}catch(e){if(e.name==="AbortError")return}}
+const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=outName;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),5000);toast("已下载",outName)}
+catch(err){toast("导出失败",err.message)}};
+
+/* 清除 */
+$("btnClearStorage").onclick=function(){if(!confirm("确定要清除已保存的表格、核对进度和运行日志吗？此操作不可恢复。"))return;
+hasSavedData=false;headers=[];rows=[];matchColIdx=null;matchedSet=new Set();matchedCells=new Set();codeIndex=new Map();checkLog=[];lastHitRow=-1;fileBase="核对结果";
+$("restoreBanner").style.display="none";$("fileName").textContent="";$("colBadge").style.display="none";showDataButtons(false);$("statCard").style.display="none";$("tableCard").style.display="none";$("logCard").style.display="none";$("readerWrap").style.display="none";$("grid").innerHTML="";$("log").innerHTML="";$("btnCamera").style.display="none";$("btnStop").style.display="none";$("uploadBusy").style.display="none";$("btnUpload").disabled=false;$("controlPanel").style.display="none";closeVoicePanel();$("fuzzyMask").classList.remove("show");
+try{deleteTableData()}catch(e){}try{deleteLogFromDB()}catch(e){}clearMatched();toast("已清除","保存的数据已删除")};
+
+/* 恢复 */
+async function tryRestore(){try{checkLog=await loadLogFromDB();
+const data=await loadTableData();if(!data||!data.rows||!data.rows.length){hasSavedData=false;return}
+hasSavedData=true;headers=data.headers||[];rows=data.rows||[];matchColIdx=(data.matchColIdx===undefined)?null:data.matchColIdx;sheetName=data.sheetName||"核对结果";fileBase=data.fileBase||"核对结果";
+const needPick=(matchColIdx===null||(matchColIdx>=0&&matchColIdx>=headers.length));
+if(needPick){pickColumn(null,function(idx){matchColIdx=idx;$("colBadge").style.display="inline";$("colBadge").textContent="核对模式："+modeText(idx);
+matchedCells=new Set(loadMatchedCells());rebuildMatchedSetFromCells();buildIndex();renderTable();updateStats();showDataButtons(true);$("statCard").style.display="block";$("tableCard").style.display="block";
+saveTableData({headers:headers,rows:rows,matchColIdx:idx,sheetName:sheetName,fileBase:fileBase,savedAt:Date.now()});toast("已读取 "+rows.length+" 行数据","")});return}
+matchedCells=new Set(loadMatchedCells());rebuildMatchedSetFromCells();
+$("fileName").textContent="（已恢复）"+fileBase+".xlsx";$("colBadge").style.display="inline";$("colBadge").textContent="核对模式："+modeText(matchColIdx);
+buildIndex();renderTable();updateStats();showDataButtons(true);$("statCard").style.display="block";$("tableCard").style.display="block";$("logCard").style.display=checkLog.length?"block":"none";
+$("restoreText").innerHTML="💾 已恢复上次核对进度（"+matchedSet.size+"/"+rows.length+" 行已核对，日志 "+checkLog.length+" 条）";$("restoreBanner").style.display="flex"}
+catch(e){console.warn("恢复数据失败",e);hasSavedData=false}}
+
+setTimeout(tryRestore,300);
 </script>
 </body>
 </html>
