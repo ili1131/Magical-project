@@ -22,45 +22,11 @@
   .stats { display: flex; gap: 10px; flex-wrap: wrap; }
   .stat { flex: 1; min-width: 90px; background: #f0f4fa; border-radius: 10px; padding: 10px; text-align: center; }
   .stat b { display: block; font-size: 22px; }
-
-  /* 摄像头容器 */
   #reader { position: relative; width: 100%; max-width: 480px; margin: 10px auto 0; display: none; border-radius: 10px; overflow: hidden; background: #000; }
   #reader video { width: 100%; display: block; background: #000; object-fit: cover; }
   .scan-frame { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 82%; height: 40%; border: 2px solid rgba(255,80,80,.9); border-radius: 10px; box-shadow: 0 0 0 9999px rgba(0,0,0,.2); pointer-events: none; z-index: 10; }
   .scan-frame::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 2px; background: rgba(255,80,80,.85); animation: scanline 2s ease-in-out infinite; }
   @keyframes scanline { 0%,100% { top: 8%; } 50% { top: 92%; } }
-
-  /* 信息显示区：固定在摄像头底部，居中，不滚动，直到下一条替换 */
-  .barrage-wrap {
-    position: absolute;
-    bottom: 12px;
-    left: 50%;
-    transform: translateX(-50%);
-    max-width: 92%;
-    pointer-events: none;
-    z-index: 20;
-    display: flex;
-    justify-content: center;
-  }
-  .barrage-item {
-    display: none;
-    white-space: nowrap;
-    color: #fff;
-    background: rgba(0, 0, 0, 0.72);
-    padding: 6px 16px;
-    border-radius: 18px;
-    font-size: 13px;
-    font-weight: 600;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    text-align: center;
-    line-height: 1.4;
-  }
-  .barrage-item.show { display: inline-block; }
-  .barrage-item .rml { color: #ffc107; margin-right: 6px; }
-
   .log { max-height: 180px; overflow-y: auto; font-size: 13px; margin-top: 10px; border-top: 1px dashed #ddd; padding-top: 8px; }
   .log .ok { color: #198754; }
   .log .dup { color: #fd7e14; }
@@ -72,7 +38,39 @@
   .table-wrap { max-height: 50vh; overflow: auto; border-radius: 8px; -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y; }
   .hint { color: #666; font-size: 13px; line-height: 1.6; }
   #fileName { font-size: 13px; color: #0b5ed7; margin-left: 6px; word-break: break-all; }
-  .toast { position: fixed; left: 50%; bottom: 60px; transform: translateX(-50%); background: rgba(0,0,0,.8); color: #fff; padding: 10px 20px; border-radius: 24px; font-size: 14px; display: none; z-index: 99; max-width: 80vw; text-align: center; }
+
+  /* 成功/失败弹窗：多行显示 */
+  .toast { 
+    position: fixed; 
+    left: 50%; 
+    bottom: 60px; 
+    transform: translateX(-50%); 
+    background: rgba(0,0,0,.88); 
+    color: #fff; 
+    padding: 14px 22px; 
+    border-radius: 18px; 
+    font-size: 15px; 
+    display: none; 
+    z-index: 99; 
+    max-width: 90vw; 
+    text-align: center; 
+    line-height: 1.6; 
+    word-break: break-word; 
+    box-shadow: 0 6px 20px rgba(0,0,0,.4);
+  }
+  .toast .head {
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .toast .info {
+    display: block;
+    font-size: 13px;
+    font-weight: 400;
+    color: #ffd75e;
+    margin-top: 2px;
+  }
+
   #loadStatus { position: fixed; inset: 0; background: rgba(255,255,255,.92); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; z-index: 100; font-size: 15px; color: #333; }
   .spinner { width: 36px; height: 36px; border: 4px solid #dbe4f0; border-top-color: #0b5ed7; border-radius: 50%; animation: spin 1s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
@@ -113,12 +111,7 @@
   <div class="card" id="scanCard" style="display:none">
     <button class="btn btn-success" id="btnCamera">② 开启摄像头实时扫描</button>
     <button class="btn btn-danger" id="btnStop" style="display:none">停止扫描</button>
-    <div id="reader">
-      <!-- 信息显示区 -->
-      <div class="barrage-wrap" id="barrageWrap">
-        <div class="barrage-item" id="barrageItem"></div>
-      </div>
-    </div>
+    <div id="reader"></div>
     <div class="hint" style="margin-top:6px; color:#dc3545;">
       ⚠️ 如果在微信中打开，请点击右上角“在浏览器中打开”。推荐使用 Chrome 或系统自带浏览器，扫码更清晰。
     </div>
@@ -151,8 +144,9 @@
   </div>
 </div>
 
-<!-- 用于 Safari 兼容的音频元素 -->
+<!-- 三个音频标签：成功、重复、失败 -->
 <audio id="audioOk"   preload="auto"></audio>
+<audio id="audioDup"  preload="auto"></audio>
 <audio id="audioMiss" preload="auto"></audio>
 
 <script>
@@ -209,127 +203,90 @@ loadAll(["XLSX","ExcelJS","Html5Qrcode"], function(ok, which){
 let sheetName = "", headers = [], rows = [];
 let matchColIdx = -1, matchedSet = new Set(), codeIndex = new Map();
 let fileBase = "核对结果";
-let lastHitRow = -1; 
+let lastHitRow = -1;
 const $ = id => document.getElementById(id);
 
-/* ===== 信息显示（固定在摄像头底部，直到下一条替换） ===== */
-function showBarrage(rowIndex) {
-  const item = $("barrageItem");
-  if (!item) return;
+/* =========================================================
+   【核心修复】用代码动态生成真实的 WAV 音频数据
+   之前给的 base64 是空数据，所以根本没声音。
+   这次直接合成正弦波形，写入 PCM 数据，生成真实能响的音频。
+   ========================================================= */
+function generateBeepUrl(freq, durationMs, volume) {
+  const sampleRate = 22050;
+  const numSamples = Math.floor(sampleRate * durationMs / 1000);
+  const buffer = new ArrayBuffer(44 + numSamples * 2);
+  const view = new DataView(buffer);
 
-  const rowData = rows[rowIndex] || [];
-  let textParts = [];
-  rowData.forEach((val, idx) => {
-    const s = String(val).trim();
-    if (s) {
-      if (idx === matchColIdx) {
-        textParts.push(`<span class="rml">${esc(s)}</span>`);
-      } else {
-        textParts.push(esc(s));
-      }
-    }
-  });
+  const writeStr = (offset, str) => {
+    for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
+  };
 
-  let fullText = textParts.join(" | ");
-  if (fullText.length > 60) {
-    fullText = fullText.substring(0, 60) + "...";
+  // WAV 头
+  writeStr(0, 'RIFF');
+  view.setUint32(4, 36 + numSamples * 2, true);
+  writeStr(8, 'WAVE');
+  writeStr(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);       // PCM
+  view.setUint16(22, 1, true);       // 单声道
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);       // block align
+  view.setUint16(34, 16, true);      // bits per sample
+  writeStr(36, 'data');
+  view.setUint32(40, numSamples * 2, true);
+
+  // 正弦波 + 淡出
+  for (let i = 0; i < numSamples; i++) {
+    const t = i / sampleRate;
+    const fade = 1 - i / numSamples;
+    const v = Math.sin(2 * Math.PI * freq * t) * 32767 * volume * fade;
+    view.setInt16(44 + i * 2, v, true);
   }
 
-  item.innerHTML = fullText;
-  item.classList.add("show");
+  const blob = new Blob([buffer], { type: 'audio/wav' });
+  return URL.createObjectURL(blob);
 }
 
-function clearBarrage() {
-  const item = $("barrageItem");
-  if (item) {
-    item.innerHTML = "";
-    item.classList.remove("show");
-  }
-}
-
-/* ===== 音频处理（针对 Safari 深度优化） ===== */
-let audioCtx = null;
-
-function initAudio() {
-  if (!audioCtx) {
-    const AudioContext = window.AudioContext || window.webkitAudioContext;
-    if (AudioContext) audioCtx = new AudioContext();
-  }
-  if (audioCtx && audioCtx.state === 'suspended') {
-    audioCtx.resume();
-  }
-
-  try {
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    gain.gain.value = 0; 
-    osc.connect(gain); gain.connect(audioCtx.destination);
-    osc.start(); osc.stop(audioCtx.currentTime + 0.01);
-  } catch(e) {}
-
-  try {
-    $("audioOk").play().then(()=>$("audioOk").pause()).catch(()=>{});
-  } catch(e) {}
-}
-
+// 页面加载时生成三个音效并绑定
 function setupAudioElements() {
-  $("audioOk").src = "data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=";
-  $("audioMiss").src = "data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=";
+  try {
+    $("audioOk").src   = generateBeepUrl(1500, 130, 0.5); // 成功：高频短促
+    $("audioDup").src  = generateBeepUrl(1000, 80,  0.5); // 重复：中频
+    $("audioMiss").src = generateBeepUrl(350,  350, 0.6); // 失败：低频长鸣
+  } catch(e) { console.warn("生成音频失败", e); }
 }
 
+// 播放
 function playBeep(type) {
-  if (audioCtx && audioCtx.state === 'running') {
-    try {
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.connect(gain); gain.connect(audioCtx.destination);
-      if (type === 'ok') {
-        osc.frequency.value = 1200;
-        gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
-        osc.start(); osc.stop(audioCtx.currentTime + 0.15);
-      } else if (type === 'dup') {
-        osc.frequency.value = 800;
-        gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
-        osc.start(); osc.stop(audioCtx.currentTime + 0.1);
-        setTimeout(() => {
-          const osc2 = audioCtx.createOscillator(); const gain2 = audioCtx.createGain();
-          osc2.connect(gain2); gain2.connect(audioCtx.destination);
-          osc2.frequency.value = 800;
-          gain2.gain.setValueAtTime(0.5, audioCtx.currentTime);
-          gain2.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
-          osc2.start(); osc2.stop(audioCtx.currentTime + 0.1);
-        }, 150);
-      } else if (type === 'miss') {
-        osc.frequency.value = 400;
-        gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
-        osc.start(); osc.stop(audioCtx.currentTime + 0.4);
-      }
-    } catch (e) { 
-      fallbackBeep(type);
-    }
-  } else {
-    fallbackBeep(type);
-  }
-}
-
-function fallbackBeep(type) {
   try {
     if (type === 'ok') {
-      $("audioOk").currentTime = 0;
-      $("audioOk").play().catch(()=>{});
+      const a = $("audioOk"); a.currentTime = 0; a.play().catch(()=>{});
+    } else if (type === 'dup') {
+      const a = $("audioDup"); a.currentTime = 0; a.play().catch(()=>{});
+      setTimeout(()=>{ try{ a.currentTime = 0; a.play().catch(()=>{}); }catch(e){} }, 130);
     } else if (type === 'miss') {
-      $("audioMiss").currentTime = 0;
-      $("audioMiss").play().catch(()=>{});
-    } else {
-      $("audioOk").currentTime = 0;
-      $("audioOk").play().catch(()=>{});
+      const a = $("audioMiss"); a.currentTime = 0; a.play().catch(()=>{});
     }
   } catch(e) {}
 }
 
+// 点击按钮时解锁 audio 标签（Safari 关键步）
+function unlockAudio() {
+  ['audioOk','audioDup','audioMiss'].forEach(id => {
+    const a = $(id);
+    if (a) {
+      a.volume = 0;
+      a.play().then(() => {
+        a.pause();
+        a.currentTime = 0;
+        a.volume = 1;
+      }).catch(()=>{ a.volume = 1; });
+    }
+  });
+}
+
+/* ---------- 语音播报（仅作辅助，Safari 上大概率无效） ---------- */
 function speak(text){
   try{
     if (!window.speechSynthesis) return;
@@ -341,13 +298,16 @@ function speak(text){
 }
 
 /* ---------- 通用 UI ---------- */
-function toast(msg, ms){
+function toast(head, info, ms){
   const t = $("toast");
-  t.textContent = msg;
+  let html = '<div class="head">' + head + '</div>';
+  if (info) html += '<span class="info">' + info + '</span>';
+  t.innerHTML = html;
   t.style.display = "block";
   clearTimeout(t._tm);
-  t._tm = setTimeout(()=> t.style.display = "none", ms || 1800);
+  t._tm = setTimeout(()=> t.style.display = "none", ms || 2600);
 }
+
 function logMsg(cls, msg){
   const d = document.createElement("div");
   d.className = cls;
@@ -366,19 +326,17 @@ function hasGetUserMedia(){
   return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
 }
 
+// 页面加载时生成音频
 setupAudioElements();
 
 /* ---------- 定位功能 ---------- */
 $("btnLocate").onclick = () => {
-  if (lastHitRow < 0) {
-    toast("还没有成功核对任何项目");
-    return;
-  }
+  if (lastHitRow < 0) { toast("提示", "还没有成功核对任何项目"); return; }
   const wrap = document.querySelector(".table-wrap");
   const tr = document.querySelector("tr[data-i='"+lastHitRow+"']");
   if (wrap && tr) {
     wrap.scrollTop = tr.offsetTop - wrap.clientHeight / 2 + tr.clientHeight / 2;
-    toast("已定位到最新核对行");
+    toast("已定位", "已滚动到最新核对行");
   }
 };
 
@@ -395,26 +353,25 @@ $("btnUpload").onclick = () => {
       sheetName = wb.SheetNames[0];
       const ws = wb.Sheets[sheetName];
       const arr = XLSX.utils.sheet_to_json(ws, {header:1, defval:""});
-      if(!arr.length){ toast("表格为空"); return; }
+      if(!arr.length){ toast("提示", "表格为空"); return; }
       headers = arr[0].map(h => String(h).trim());
       rows = arr.slice(1).filter(r => r.some(c => String(c).trim() !== ""));
       matchColIdx = headers.findIndex(h => h.toUpperCase() === "RML/RMD");
       if(matchColIdx < 0) matchColIdx = headers.findIndex(h => h.replace(/\s/g,"").toUpperCase().includes("RML"));
-      if(matchColIdx < 0){ toast("未找到 RML/RMD 列，请检查表头"); return; }
+      if(matchColIdx < 0){ toast("提示", "未找到 RML/RMD 列，请检查表头"); return; }
 
       $("colBadge").style.display = "inline";
       $("colBadge").textContent = "核对列：" + headers[matchColIdx];
 
       matchedSet = new Set();
-      lastHitRow = -1; 
-      clearBarrage();
+      lastHitRow = -1;
       buildIndex();
       renderTable(); updateStats();
 
       $("scanCard").style.display = "block";
       $("tableCard").style.display = "block";
-      toast("已读取 " + rows.length + " 行数据");
-    } catch(err){ toast("读取失败：" + err.message); }
+      toast("已读取 " + rows.length + " 行数据", "");
+    } catch(err){ toast("读取失败", err.message); }
   };
   inp.click();
 };
@@ -445,6 +402,21 @@ function updateStats(){
   $("stLeft").textContent = rows.length - matchedSet.size;
 }
 
+/* 提取某行信息，拼接成一行可读文本（用于弹窗显示） */
+function getRowInfo(rowIndex) {
+  const rowData = rows[rowIndex] || [];
+  const parts = [];
+  rowData.forEach((val, idx) => {
+    const s = String(val).trim();
+    if (s) {
+      // 每列加上表头，让信息更清晰
+      const h = headers[idx] ? headers[idx] : ("列" + (idx + 1));
+      parts.push(h + "：" + s);
+    }
+  });
+  return parts.join(" | ");
+}
+
 /* ---------- 核对逻辑 ---------- */
 function check(code){
   code = String(code||"").trim(); if(!code) return;
@@ -457,27 +429,27 @@ function check(code){
   const ts = new Date().toLocaleTimeString();
   if(hit >= 0){
     matchedSet.add(hit);
-    lastHitRow = hit; 
+    lastHitRow = hit;
     logMsg("ok", ts + " ✅ 匹配成功：" + code);
     renderTable(); updateStats();
-    
+
+    // ===== 核心修复：播真实音频 =====
     playBeep('ok');
-    speak("可以配送"); 
-    
-    // 更新显示信息（会覆盖上一条）
-    showBarrage(hit);
-    
-    toast("✅ 已标红：" + code);
+    speak("可以配送"); // 辅助语音（Safari上可能无效，但其他浏览器能用）
+
+    // 弹窗显示 + 行信息
+    const info = getRowInfo(hit);
+    toast("✅ 已核对", info);
   } else if(dup){
     logMsg("dup", ts + " ⚠️ 重复扫描：" + code);
     playBeep('dup');
-    speak("重复扫描"); 
-    toast("⚠️ 重复扫描：该条码已核对过");
+    speak("重复扫描");
+    toast("⚠️ 重复扫描", "该条码已核对过：" + code);
   } else {
     logMsg("miss", ts + " ❌ 未在表格中找到：" + code);
     playBeep('miss');
-    speak("不可配送，需滞留"); 
-    toast("❌ 未找到该条码");
+    speak("不可配送，需滞留");
+    toast("❌ 不可配送，需滞留", "未在表格中找到：" + code);
   }
   if(matchedSet.size === rows.length && rows.length) speak("核对完成");
 }
@@ -527,21 +499,18 @@ async function startNativeScan(){
   if(!det) throw new Error("no-native-detector");
 
   const container = $("reader");
-  // 保留弹幕区，只清空视频/扫描框
-  const oldWrap = $("barrageWrap");
   container.innerHTML = "";
-  container.appendChild(oldWrap);
 
   const video = document.createElement("video");
   video.setAttribute("playsinline", "");
   video.setAttribute("muted", "");
   video.autoplay = true;
   video.muted = true;
-  container.insertBefore(video, oldWrap);
+  container.appendChild(video);
 
   const overlay = document.createElement("div");
   overlay.className = "scan-frame";
-  container.insertBefore(overlay, oldWrap);
+  container.appendChild(overlay);
 
   let stream = null, lastErr = null;
   try {
@@ -603,11 +572,8 @@ async function scanLoop(){
 async function startFallbackScan(){
   if(typeof Html5Qrcode === "undefined") throw new Error("扫码库未加载");
   fallbackMode = true;
-  const container = $("reader");
-  const oldWrap = $("barrageWrap");
-  container.innerHTML = "";
-  container.appendChild(oldWrap);
-
+  const el = $("reader");
+  el.innerHTML = "";
   scanner = new Html5Qrcode("reader", false);
   await scanner.start(
     { facingMode: "environment" },
@@ -642,9 +608,7 @@ async function stopScan(){
   }
   stopCamStream();
   const el = $("reader");
-  const oldWrap = $("barrageWrap");
   el.innerHTML = "";
-  el.appendChild(oldWrap);
   el.style.display = "none";
   $("btnCamera").style.display = "inline-block";
   $("btnStop").style.display = "none";
@@ -664,8 +628,9 @@ function cameraErrText(e){
 
 $("btnCamera").onclick = async () => {
   if(scanning || starting) return;
-  
-  initAudio(); 
+
+  // 关键：用户点击时，立刻解锁音频标签
+  unlockAudio();
 
   if(!hasGetUserMedia()){
     popup("不支持摄像头", "请使用 Chrome 或系统自带浏览器打开，不要用微信内置浏览器。");
@@ -682,9 +647,7 @@ $("btnCamera").onclick = async () => {
       catch(e){
         console.warn("原生扫码不可用，回退降级方案：", e);
         stopCamStream();
-        const oldWrap = $("barrageWrap");
         $("reader").innerHTML = "";
-        $("reader").appendChild(oldWrap);
       }
     }
     if(!ok){ await startFallbackScan(); }
@@ -732,8 +695,8 @@ $("btnExport").onclick = async () => {
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob); a.download = outName; a.click();
     setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
-    toast("已下载");
-  }catch(err){ toast("导出失败：" + err.message); }
+    toast("已下载", "");
+  }catch(err){ toast("导出失败", err.message); }
 };
 </script>
 </body>
