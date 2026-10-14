@@ -84,7 +84,6 @@
     display: none;
   }
 
-  /* 控制面板样式 */
   #controlPanel {
     position: absolute;
     bottom: 10px; left: 50%; transform: translateX(-50%);
@@ -225,19 +224,15 @@
     <div id="reader">
       <div id="camStatus"></div>
       <div class="focus-ring" id="focusRing"></div>
-      <!-- 摄像头控制面板 -->
       <div id="controlPanel">
-        <!-- 变焦滑块 -->
         <div class="control-row" id="zoomRow" style="display:none;">
           <span>变焦</span>
           <input type="range" id="zoomSlider" min="1" max="8" step="0.1" value="1">
         </div>
-        <!-- 手动对焦距离滑块（如果支持） -->
         <div class="control-row" id="focusDistanceRow" style="display:none;">
           <span>对焦</span>
           <input type="range" id="focusDistanceSlider" min="0" max="1" step="0.01" value="0.5">
         </div>
-        <!-- 变焦步进微调按钮（如果不支持手动对焦距离，则用变焦步进触发对焦） -->
         <div class="control-row" id="focusStepRow" style="display:none;">
           <span>微调</span>
           <div id="focusStepBtnGroup">
@@ -343,6 +338,11 @@ let lastHitRow = -1;
 let hasSavedData = false;
 let checkLog = [];
 const $ = id => document.getElementById(id);
+
+/* ===== 平台检测（关键！）===== */
+const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+               (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+console.log("[平台] iOS:", IS_IOS);
 
 function showDataButtons(show) {
   document.querySelectorAll(".need-data").forEach(el => {
@@ -539,7 +539,6 @@ function esc(s){
   return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 }
 
-/* ===== 核对模式显示文本 ===== */
 function modeText(idx) {
   if (idx === -1) return "全部列（核对整表所有单元格）";
   if (idx === null || idx === undefined) return "";
@@ -950,10 +949,34 @@ async function makeDetector(){
   return null;
 }
 
+/* ===== 关键：平台差异化约束 ===== */
 async function openCameraWithBestConstraints() {
   const base = { facingMode: { ideal: "environment" } };
-  const ptzRequest = { zoom: true };
 
+  // iOS 上使用最简约束，避免 PTZ/advanced 导致流不稳定
+  if (IS_IOS) {
+    console.log("[摄像头] iOS 平台，使用简化约束");
+    const iosTries = [
+      { audio:false, video: Object.assign({}, base, { width: { ideal: 1280 }, height: { ideal: 720 } }) },
+      { audio:false, video: Object.assign({}, base, { width: { ideal: 640 }, height: { ideal: 480 } }) },
+      { audio:false, video: base }
+    ];
+    let lastErr = null;
+    for (let i = 0; i < iosTries.length; i++) {
+      try {
+        const s = await navigator.mediaDevices.getUserMedia(iosTries[i]);
+        console.log("[摄像头] iOS 成功使用第 " + (i+1) + " 套约束");
+        return s;
+      } catch(e) {
+        lastErr = e;
+        console.warn("[摄像头] iOS 第 " + (i+1) + " 套失败：", e.name || e.message);
+      }
+    }
+    throw lastErr || new Error("无法打开摄像头");
+  }
+
+  // 安卓/PC：保留完整 PTZ 请求
+  const ptzRequest = { zoom: true };
   const advancedFocus = [
     { focusMode: "continuous" },
     { exposureMode: "continuous" },
@@ -994,6 +1017,13 @@ async function openCameraWithBestConstraints() {
 
 async function tuneTrackAfterStart(track) {
   if(!track) return;
+
+  // iOS 上不主动 applyConstraints，避免干扰系统自动对焦
+  if (IS_IOS) {
+    console.log("[调优] iOS 平台跳过 applyConstraints");
+    return;
+  }
+
   try {
     const caps = (track.getCapabilities ? track.getCapabilities() : {}) || {};
 
@@ -1180,48 +1210,101 @@ function stopCamStream(){
       camStream.getTracks().forEach(t => t.stop());
     }catch(e){ console.warn("停止轨道失败", e); }
   }
+  camStream = null; camTrack = null;
   if(camVideo) {
     try { camVideo.pause(); } catch(e){}
     try { camVideo.srcObject = null; } catch(e){}
   }
-  camStream = null; camTrack = null; camVideo = null; nativeDetector = null;
+  camVideo = null;
+  nativeDetector = null;
 }
 
-/* ===== 核心修复：优先恢复UI，再异步停止摄像头 ===== */
-async function stopScan(){
-  // 1. 【同步执行】立即恢复所有UI按钮，确保用户一定能看到变化
-  $("readerWrap").style.display = "none";
-  $("camTip").style.display = "none";
-  $("camStatus").style.display = "none";
-  $("controlPanel").style.display = "none";
-  $("btnCamera").style.display = "";
-  $("btnStop").style.display = "none";
-  $("btnCamera").disabled = false;
+/* ===== 强制恢复 UI（同步，纯 DOM 操作，绝对不抛错）===== */
+function forceRestoreCameraUI() {
+  try { $("readerWrap").style.display = "none"; } catch(e){}
+  try { $("camTip").style.display = "none"; } catch(e){}
+  try { $("camStatus").style.display = "none"; } catch(e){}
+  try { $("controlPanel").style.display = "none"; } catch(e){}
+  try { $("btnCamera").style.display = ""; } catch(e){}
+  try { $("btnStop").style.display = "none"; } catch(e){}
+  try { $("btnCamera").disabled = false; } catch(e){}
+}
 
-  // 2. 停止扫描逻辑
+/* ===== 停止扫描（同步执行，不依赖任何异步）===== */
+function stopScan(){
+  console.log("[stopScan] 开始");
+
+  // 1. 立即同步恢复 UI（最优先，纯 DOM 操作）
+  forceRestoreCameraUI();
+
+  // 2. 复位标志位
   scanning = false;
-  if(scanTimer){ clearTimeout(scanTimer); scanTimer = null; }
+  starting = false;
 
-  // 3. 释放本地摄像头流（同步，不会卡住）
-  stopCamStream();
+  // 3. 清理定时器
+  if (scanTimer) { clearTimeout(scanTimer); scanTimer = null; }
+  if (window._focusInterval) { clearInterval(window._focusInterval); window._focusInterval = null; }
 
-  // 4. 处理 Html5Qrcode 的停止（不 await，避免 iOS 上卡死）
-  if(fallbackMode && scanner){
-    const oldScanner = scanner;
-    scanner = null;
-    fallbackMode = false;
+  // 4. 保存引用后立即清空全局状态
+  const oldStream = camStream;
+  const oldVideo = camVideo;
+  const oldScanner = scanner;
+  const wasFallback = fallbackMode;
+
+  camStream = null; camTrack = null; camVideo = null; nativeDetector = null;
+  scanner = null; fallbackMode = false;
+
+  // 5. 立即移除 reader 内的 video 元素（同步，确保 iOS 释放摄像头）
+  try {
+    const readerEl = $("reader");
+    readerEl.querySelectorAll("video").forEach(v => {
+      try { v.pause(); } catch(e){}
+      try { v.srcObject = null; } catch(e){}
+      try { if (v.parentNode) v.parentNode.removeChild(v); } catch(e){}
+    });
+  } catch(e){ console.warn("移除 video 元素失败", e); }
+
+  // 6. 后台异步释放资源（不阻塞，不 await）
+  setTimeout(function() {
     try {
-      // 不等待 Promise resolve，直接调用，让它在后台默默结束
-      oldScanner.stop().then(() => {
-         try { oldScanner.clear(); } catch(e){}
-      }).catch(e => {
-         console.warn("停止Html5Qrcode失败:", e);
-         try { oldScanner.clear(); } catch(e){}
-      });
-    } catch(e) {
-      try { oldScanner.clear(); } catch(e){}
+      if (oldStream) {
+        oldStream.getTracks().forEach(t => { try { t.stop(); } catch(e){} });
+      }
+    } catch(e){}
+    if (oldVideo) {
+      try { oldVideo.pause(); } catch(e){}
+      try { oldVideo.srcObject = null; } catch(e){}
     }
-  }
+    if (wasFallback && oldScanner) {
+      try {
+        const p = oldScanner.stop();
+        if (p && typeof p.then === "function") {
+          p.then(() => { try { oldScanner.clear(); } catch(e){} })
+           .catch(() => { try { oldScanner.clear(); } catch(e){} });
+        } else {
+          try { oldScanner.clear(); } catch(e){}
+        }
+      } catch(e) {
+        try { oldScanner.clear(); } catch(e){}
+      }
+    }
+  }, 30);
+
+  // 7. 兜底：800ms 后如果按钮状态还没恢复，强制恢复一次
+  setTimeout(function() {
+    try {
+      if (!scanning && !starting) {
+        const camBtn = $("btnCamera");
+        const stopBtn = $("btnStop");
+        if (camBtn && camBtn.style.display === "none" && stopBtn && stopBtn.style.display !== "none") {
+          console.log("[stopScan] 兜底强制恢复 UI");
+          forceRestoreCameraUI();
+        }
+      }
+    } catch(e){}
+  }, 800);
+
+  console.log("[stopScan] 完成");
 }
 
 function cameraErrText(e){
@@ -1249,12 +1332,14 @@ $("btnCamera").onclick = async () => {
 
   try{
     let ok = false;
-    if("BarcodeDetector" in window){
+    if("BarcodeDetector" in window && !IS_IOS){
+      // iOS 上 BarcodeDetector 兼容性差，直接走 Html5Qrcode
       try{ ok = await startNativeScan(); }
       catch(e){
         console.warn("原生扫码不可用，回退降级方案：", e);
         stopCamStream();
-        $("reader").innerHTML = "";
+        const readerEl = $("reader");
+        while (readerEl.firstChild) readerEl.removeChild(readerEl.firstChild);
       }
     }
     if(!ok){ await startFallbackScan(); }
@@ -1262,14 +1347,20 @@ $("btnCamera").onclick = async () => {
     $("btnCamera").style.display = "none";
     $("btnStop").style.display = "";
   }catch(e){
-    await stopScan();
+    console.error("启动扫描失败：", e);
+    stopScan();
     popup("无法开启相机", cameraErrText(e));
   }finally{
     starting = false;
     $("btnCamera").disabled = false;
   }
 };
-$("btnStop").onclick = () => { stopScan(); };
+
+/* 停止按钮：同步绑定 */
+$("btnStop").onclick = function() {
+  console.log("[按钮] 停止扫描被点击");
+  stopScan();
+};
 
 /* =========================================================
    导出工具
