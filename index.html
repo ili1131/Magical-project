@@ -106,7 +106,6 @@
     width: 20px; height: 20px; border-radius: 50%;
     background: #0dcaf0; cursor: pointer; box-shadow: 0 0 4px rgba(0,0,0,.5);
   }
-  /* 变焦按钮组 */
   #focusStepBtnGroup { display: none; gap: 8px; align-items: center; }
   #focusStepBtnGroup button {
     flex: 1; padding: 6px; font-size: 12px; font-weight: bold;
@@ -335,11 +334,10 @@ loadOne(LIBS.XLSX, 0, function(){
 
 <script>
 let sheetName = "", headers = [], rows = [];
-// matchColIdx: null=未选择, -1=全部列模式, >=0=指定列
 let matchColIdx = null;
-let matchedSet = new Set();       // 已核对的行索引（用于统计）
-let matchedCells = new Set();     // 已核对的单元格 "行-列"
-let codeIndex = new Map();        // code -> [{r, c}, ...]
+let matchedSet = new Set();
+let matchedCells = new Set();
+let codeIndex = new Map();
 let fileBase = "核对结果";
 let lastHitRow = -1;
 let hasSavedData = false;
@@ -427,7 +425,6 @@ function clearMatched() {
   } catch(e) {}
 }
 
-/* 从 matchedCells 重新推导 matchedSet */
 function rebuildMatchedSetFromCells() {
   matchedSet = new Set();
   matchedCells.forEach(k => {
@@ -549,7 +546,7 @@ function modeText(idx) {
   return headers[idx] || ("第" + (idx + 1) + "列");
 }
 
-/* ===== 列选择（含"全部列"） ===== */
+/* ===== 列选择 ===== */
 function pickColumn(currentIdx, callback) {
   const mask = $("colPickerMask");
   const list = $("colPickerList");
@@ -655,7 +652,7 @@ function pickFile() {
   inp.click();
 }
 
-/* ===== 切换核对模式（不重置已核对数据） ===== */
+/* ===== 切换核对模式 ===== */
 $("btnChangeCol").onclick = () => {
   if (!headers.length) return;
   pickColumn(matchColIdx, function(idx) {
@@ -674,7 +671,7 @@ $("btnChangeCol").onclick = () => {
   });
 };
 
-/* ===== 建立索引：支持"全部列"与"指定列"两种模式 ===== */
+/* ===== 建立索引 ===== */
 function buildIndex(){
   codeIndex = new Map();
   if (matchColIdx === null || matchColIdx === undefined) return;
@@ -698,7 +695,7 @@ function buildIndex(){
   }
 }
 
-/* ===== 渲染表格：只标红命中的单元格 ===== */
+/* ===== 渲染表格 ===== */
 function renderTable(){
   let html = "<tr>" + headers.map(h=>"<th>"+esc(h)+"</th>").join("") + "</tr>";
   rows.forEach((r,i)=>{
@@ -826,12 +823,11 @@ function showCamStatus(track) {
 }
 
 /* =========================================================
-   手动干预：对焦与微调控制
+   手动干预控制
    ========================================================= */
 async function applyManualFocus(track, value) {
   if (!track) return;
   try {
-    // 关键：手动模式下必须明确指定 focusDistance
     const settings = track.getSettings();
     await track.applyConstraints({
       width: settings.width || { ideal: 1920 },
@@ -860,7 +856,6 @@ async function applyZoomBump(track, delta) {
       zoom: targetZoom
     });
     console.log("[变焦微调] 从", currentZoom, "调整到", targetZoom);
-    // 同步更新滑块显示
     if ($("zoomSlider").style.display !== "none") {
       $("zoomSlider").value = targetZoom;
     }
@@ -869,9 +864,6 @@ async function applyZoomBump(track, delta) {
   }
 }
 
-/* =========================================================
-   点击对焦：针对 Android 优化的务实方案
-   ========================================================= */
 async function tryFocusAtPoint(track, x, y) {
   if (!track) return false;
   const caps = (track.getCapabilities ? track.getCapabilities() : {}) || {};
@@ -881,32 +873,25 @@ async function tryFocusAtPoint(track, x, y) {
     height: settings.height || { ideal: 1080 }
   };
 
-  console.log("[对焦] 尝试对焦，当前对焦能力:", caps.focusMode);
-
-  // 方案1：强制切回 continuous 模式
   if (Array.isArray(caps.focusMode) && caps.focusMode.includes('continuous')) {
     try {
       await track.applyConstraints(Object.assign({}, baseConstraints, { advanced: [{ focusMode: 'continuous' }] }));
-      console.log("[对焦] ✓ 已切回连续自动对焦");
       return true;
-    } catch(e) { console.warn("切回 continuous 失败", e); }
+    } catch(e) {}
   }
 
-  // 方案2：触发 single-shot 单次对焦
   if (Array.isArray(caps.focusMode) && caps.focusMode.includes('single-shot')) {
     try {
       await track.applyConstraints(Object.assign({}, baseConstraints, { advanced: [{ focusMode: 'single-shot' }] }));
-      console.log("[对焦] ✓ 已触发单次对焦");
       setTimeout(() => {
         if (Array.isArray(caps.focusMode) && caps.focusMode.includes('continuous')) {
           try { track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }); } catch(e){}
         }
       }, 2000);
       return true;
-    } catch(e) { console.warn("单次对焦失败", e); }
+    } catch(e) {}
   }
 
-  // 方案3：变焦微调触发系统重对焦
   if (caps.zoom && caps.zoom.max > caps.zoom.min) {
     try {
       const currentZoom = track.getSettings().zoom || caps.zoom.min;
@@ -915,12 +900,10 @@ async function tryFocusAtPoint(track, x, y) {
       setTimeout(() => {
         try { track.applyConstraints({ zoom: currentZoom }); } catch(e){}
       }, 200);
-      console.log("[对焦] ✓ 已通过变焦微调触发重对焦");
       return true;
-    } catch(e) { console.warn("变焦微调失败", e); }
+    } catch(e) {}
   }
 
-  console.warn("[对焦] ✗ 所有对焦方案均失败");
   return false;
 }
 
@@ -1016,7 +999,7 @@ async function tuneTrackAfterStart(track) {
 
     if (Array.isArray(caps.focusMode) && caps.focusMode.includes("continuous")) {
       try { await track.applyConstraints({ advanced: [{ focusMode: "continuous" }] }); }
-      catch(e) { console.warn("初始连续对焦设置失败", e); }
+      catch(e) {}
     } else if (Array.isArray(caps.focusMode) && caps.focusMode.length) {
       try { await track.applyConstraints({ advanced: [{ focusMode: "single-shot" }] }); } catch(e){}
       if (window._focusInterval) clearInterval(window._focusInterval);
@@ -1076,7 +1059,6 @@ async function startNativeScan(){
   const caps = camTrack.getCapabilities ? camTrack.getCapabilities() : {};
   let hasAnyControl = false;
 
-  // 1. 变焦滑块
   const browserSupportsZoom = navigator.mediaDevices.getSupportedConstraints().zoom;
   const deviceSupportsZoom = caps.zoom && caps.zoom.max > caps.zoom.min;
 
@@ -1100,12 +1082,10 @@ async function startNativeScan(){
       zoomRow.style.display = "none";
   }
 
-  // 2. 手动对焦距离滑块（如果设备支持 focusDistance）
   if (caps.focusDistance && caps.focusDistance.max > caps.focusDistance.min) {
       focusDistanceSlider.min = caps.focusDistance.min;
       focusDistanceSlider.max = caps.focusDistance.max;
       focusDistanceSlider.step = caps.focusDistance.step || 0.01;
-      // 设置默认值，通常取中间值
       let defaultVal = (caps.focusDistance.min + caps.focusDistance.max) / 2;
       focusDistanceSlider.value = defaultVal;
       focusDistanceRow.style.display = "flex";
@@ -1119,7 +1099,6 @@ async function startNativeScan(){
       focusDistanceRow.style.display = "none";
   }
 
-  // 3. 变焦步进按钮（如果不支持手动对焦距离，则显示这些按钮来触发对焦）
   if (!caps.focusDistance || caps.focusDistance.max <= caps.focusDistance.min) {
       focusStepRow.style.display = "flex";
       hasAnyControl = true;
@@ -1196,25 +1175,42 @@ async function boostStreamResolution(){
 
 function stopCamStream(){
   if(window._focusInterval){ clearInterval(window._focusInterval); window._focusInterval = null; }
-  if(camStream){ try{ camStream.getTracks().forEach(t => t.stop()); }catch(e){} }
+  if(camStream){
+    try{
+      camStream.getTracks().forEach(t => t.stop());
+    }catch(e){ console.warn("停止轨道失败", e); }
+  }
+  if(camVideo) {
+    try { camVideo.pause(); } catch(e){}
+    try { camVideo.srcObject = null; } catch(e){}
+  }
   camStream = null; camTrack = null; camVideo = null; nativeDetector = null;
 }
 
+/* ===== 核心修复：无论发生什么，确保 UI 按钮恢复 ===== */
 async function stopScan(){
   scanning = false;
   if(scanTimer){ clearTimeout(scanTimer); scanTimer = null; }
-  if(fallbackMode && scanner){
-    try{ await scanner.stop(); }catch(e){}
-    try{ scanner.clear(); }catch(e){}
-    scanner = null; fallbackMode = false;
+
+  try {
+    if(fallbackMode && scanner){
+      try { await scanner.stop(); } catch(e) { console.warn("停止扫码器失败", e); }
+      try { scanner.clear(); } catch(e) {}
+      scanner = null; fallbackMode = false;
+    }
+    stopCamStream();
+  } catch (err) {
+    console.error("停止扫描时发生错误:", err);
+  } finally {
+    // 必须放在 finally 中，防止因某个异常导致 UI 卡死
+    $("readerWrap").style.display = "none";
+    $("camTip").style.display = "none";
+    $("camStatus").style.display = "none";
+    $("controlPanel").style.display = "none";
+    $("btnCamera").style.display = "";
+    $("btnStop").style.display = "none";
+    $("btnCamera").disabled = false; // 确保按钮可再次点击
   }
-  stopCamStream();
-  $("readerWrap").style.display = "none";
-  $("camTip").style.display = "none";
-  $("camStatus").style.display = "none";
-  $("controlPanel").style.display = "none";
-  $("btnCamera").style.display = "";
-  $("btnStop").style.display = "none";
 }
 
 function cameraErrText(e){
