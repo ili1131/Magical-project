@@ -26,21 +26,18 @@
   .scan-frame { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 82%; height: 40%; border: 2px solid rgba(255,80,80,.9); border-radius: 10px; box-shadow: 0 0 0 9999px rgba(0,0,0,.2); pointer-events: none; }
   .scan-frame::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 2px; background: rgba(255,80,80,.85); animation: scanline 2s ease-in-out infinite; }
   @keyframes scanline { 0%,100% { top: 8%; } 50% { top: 92%; } }
-  .manual-row { display: flex; gap: 8px; margin-top: 10px; }
-  .manual-row input { flex: 1; padding: 12px; border: 2px solid #0b5ed7; border-radius: 10px; font-size: 16px; }
   .log { max-height: 180px; overflow-y: auto; font-size: 13px; margin-top: 10px; border-top: 1px dashed #ddd; padding-top: 8px; }
   .log .ok { color: #198754; }
   .log .dup { color: #fd7e14; }
   .log .miss { color: #dc3545; }
   
-  /* ====== 这里改动了表格的样式，解决无法横向拖动的问题 ====== */
+  /* ====== 表格样式：支持横向拖动 ====== */
   table { border-collapse: collapse; font-size: 13px; width: max-content; min-width: 100%; }
   th, td { border: 1px solid #e3e7ee; padding: 7px 8px; text-align: left; white-space: nowrap; }
   th { background: #eef2f8; position: sticky; top: 0; z-index: 1; }
   tr.matched td { background: #ffe3e3 !important; color: #b02a37; font-weight: 700; }
-  /* 增加 -webkit-overflow-scrolling 让苹果手机滑动更丝滑 */
   .table-wrap { max-height: 50vh; overflow: auto; border-radius: 8px; -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y; }
-  /* ====================================================== */
+  /* =================================== */
 
   .hint { color: #666; font-size: 13px; line-height: 1.6; }
   #fileName { font-size: 13px; color: #0b5ed7; margin-left: 6px; word-break: break-all; }
@@ -86,10 +83,6 @@
     <button class="btn btn-success" id="btnCamera">② 开启摄像头实时扫描</button>
     <button class="btn btn-danger" id="btnStop" style="display:none">停止扫描</button>
     <div id="reader"></div>
-    <div class="manual-row">
-      <input id="manualInput" placeholder="或手动输入 / 粘贴条码后回车" autocomplete="off">
-      <button class="btn btn-secondary" id="btnManual">核对</button>
-    </div>
     <div class="hint" style="margin-top:6px; color:#dc3545;">
       ⚠️ 如果在微信中打开，请点击右上角“在浏览器中打开”。推荐使用 Chrome 或系统自带浏览器，扫码更清晰。
     </div>
@@ -285,7 +278,6 @@ $("btnUpload").onclick = () => {
 
       $("scanCard").style.display = "block";
       $("tableCard").style.display = "block";
-      $("manualInput").focus();
       toast("已读取 " + rows.length + " 行数据");
     } catch(err){ toast("读取失败：" + err.message); }
   };
@@ -348,10 +340,6 @@ function check(code){
   }
   if(matchedSet.size === rows.length && rows.length) speak("核对完成");
 }
-$("manualInput").addEventListener("keydown", e => {
-  if(e.key === "Enter"){ check($("manualInput").value); $("manualInput").value=""; }
-});
-$("btnManual").onclick = () => { check($("manualInput").value); $("manualInput").value=""; $("manualInput").focus(); };
 
 /* =========================================================
    扫码
