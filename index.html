@@ -18,6 +18,7 @@
   .btn-danger  { background: #dc3545; color: #fff; }
   .btn-secondary { background: #6c757d; color: #fff; }
   .btn-warning { background: #fd7e14; color: #fff; }
+  .btn-info { background: #0dcaf0; color: #05323a; }
   .btn:disabled { opacity: .45; cursor: not-allowed; }
   .btn-sm { padding: 6px 12px; font-size: 13px; }
 
@@ -131,7 +132,8 @@
   </div>
 
   <div class="card" id="tableCard" style="display:none">
-    <button class="btn btn-success" id="btnExport">③ 导出核对结果并分享</button>
+    <button class="btn btn-success" id="btnExport">③ 导出全部（带标红）</button>
+    <button class="btn btn-info" id="btnExportMatched">④ 只导出已核对行</button>
     <button class="btn btn-warning" id="btnLocate">📍 定位最后核对项</button>
     <span id="exportName" class="hint"></span>
     <div class="table-wrap" style="margin-top:10px"><table id="grid"></table></div>
@@ -149,7 +151,7 @@
 </div>
 
 <script>
-/* ===== 多 CDN 容错加载（国内优先 + 并行） ===== */
+/* ===== 多 CDN 容错加载 ===== */
 var LIBS = {
   XLSX: [
     "https://cdn.bootcdn.net/ajax/libs/xlsx/0.18.5/xlsx.full.min.js",
@@ -197,11 +199,11 @@ let sheetName = "", headers = [], rows = [];
 let matchColIdx = -1, matchedSet = new Set(), codeIndex = new Map();
 let fileBase = "核对结果";
 let lastHitRow = -1;
-let hasSavedData = false;  // 缓存"是否有旧数据"，避免点击时异步查询
+let hasSavedData = false;
 const $ = id => document.getElementById(id);
 
 /* =========================================================
-   IndexedDB 工具：存表格数据
+   IndexedDB 工具
    ========================================================= */
 const DB_NAME = 'philips_check_db';
 const DB_VERSION = 1;
@@ -269,7 +271,7 @@ function clearMatched() {
 }
 
 /* =========================================================
-   音频（Web Audio API）
+   音频
    ========================================================= */
 let audioCtx = null;
 function ensureCtx() {
@@ -360,16 +362,15 @@ function esc(s){
 }
 
 /* =========================================================
-   【核心修复】上传按钮：同步打开文件选择框
+   上传（同步打开文件框）
    ========================================================= */
 $("btnUpload").onclick = () => {
-  // 用缓存的 hasSavedData 做同步判断（Safari 要求 input.click() 必须在同步栈里）
   if (hasSavedData) {
     if (!confirm("检测到上次保存的核对数据。\n\n上传新表格会覆盖旧数据，是否继续？\n\n（如果想保留旧数据，点取消）")) {
       return;
     }
   }
-  pickFile();  // 同步调用，Safari 才会弹出文件框
+  pickFile();
 };
 
 function pickFile() {
@@ -413,7 +414,6 @@ function pickFile() {
       $("scanCard").style.display = "block";
       $("tableCard").style.display = "block";
 
-      // 界面已经渲染好了，异步后台保存
       toast("已读取 " + rows.length + " 行数据", "正在后台保存进度…");
 
       saveTableData({
@@ -506,7 +506,7 @@ function check(code){
     lastHitRow = hit;
     logMsg("ok", ts + " ✅ 匹配成功：" + code);
     renderTable(); updateStats();
-    saveMatched(); // 每核对成功立即保存
+    saveMatched();
 
     playBeep('ok');
     speak("可以配送");
@@ -735,41 +735,76 @@ $("btnCamera").onclick = async () => {
 
 $("btnStop").onclick = () => { stopScan(); };
 
-/* ===== 导出 ===== */
-$("btnExport").onclick = async () => {
-  if(!rows.length) return;
+/* =========================================================
+   导出工具（通用）
+   buildAndShareExcel(行号数组, 文件名后缀)
+   ========================================================= */
+async function buildAndShareExcel(rowIdxList, suffix) {
   if (typeof ExcelJS === "undefined") {
     toast("导出组件未加载完成", "请稍后再试，或刷新页面");
     return;
   }
-  try{
+  if (!rowIdxList.length) {
+    toast("提示", "没有可导出的数据");
+    return;
+  }
+  try {
     const wb = new ExcelJS.Workbook();
     const ws = wb.addWorksheet(sheetName || "核对结果");
     ws.addRow(headers).font = { bold: true };
-    rows.forEach((r,i)=>{
-      const row = ws.addRow(headers.map((_,j)=> r[j] ?? ""));
-      if(matchedSet.has(i)){
-        row.eachCell(cell=>{
-          cell.fill = { type:"pattern", pattern:"solid", fgColor:{ argb:"FFFFC7CE" } };
-          cell.font = { color:{ argb:"FF9C0006" }, bold:true };
+
+    rowIdxList.forEach(i => {
+      const r = rows[i] || [];
+      const row = ws.addRow(headers.map((_, j) => r[j] ?? ""));
+      if (matchedSet.has(i)) {
+        row.eachCell(cell => {
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFC7CE" } };
+          cell.font = { color: { argb: "FF9C0006" }, bold: true };
         });
       }
     });
-    headers.forEach((h,j)=>{ ws.getColumn(j+1).width = Math.max(12, String(h).length*2 + 6); });
+
+    headers.forEach((h, j) => { ws.getColumn(j + 1).width = Math.max(12, String(h).length * 2 + 6); });
+
     const buf = await wb.xlsx.writeBuffer();
-    const outName = fileBase + "_已核对.xlsx";
+    const outName = fileBase + "_" + suffix + ".xlsx";
     $("exportName").textContent = "已生成：" + outName;
+
     const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
     const file = new File([blob], outName, { type: blob.type });
-    if(navigator.canShare && navigator.canShare({ files: [file] })) {
+
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
       try { await navigator.share({ files: [file], title: "核对结果" }); return; }
       catch(e){ if(e.name === "AbortError") return; }
     }
+
     const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob); a.download = outName; a.click();
+    a.href = URL.createObjectURL(blob);
+    a.download = outName;
+    a.click();
     setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
-    toast("已下载", "");
-  }catch(err){ toast("导出失败", err.message); }
+    toast("已下载", outName);
+  } catch (err) {
+    toast("导出失败", err.message);
+  }
+}
+
+/* 按钮③：导出全部（原表格 + 标红） */
+$("btnExport").onclick = () => {
+  if (!rows.length) return;
+  buildAndShareExcel(rows.map((_, i) => i), "已核对");
+};
+
+/* 按钮④：只导出已核对（标红）的行 */
+$("btnExportMatched").onclick = () => {
+  if (!rows.length) return;
+  if (matchedSet.size === 0) {
+    toast("提示", "还没有已核对的行可导出");
+    return;
+  }
+  // 按原始行号排序，让导出顺序和表格一致
+  const idxList = Array.from(matchedSet).sort((a, b) => a - b);
+  buildAndShareExcel(idxList, "已核对行");
 };
 
 /* ===== 清除保存的数据 ===== */
@@ -833,7 +868,6 @@ async function tryRestore() {
   }
 }
 
-// 页面加载后异步查询一次，缓存结果
 setTimeout(tryRestore, 300);
 </script>
 </body>
