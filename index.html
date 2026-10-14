@@ -13,7 +13,6 @@
   main { max-width: 960px; margin: 0 auto; padding: 14px; }
   .card { background: #fff; border-radius: 12px; padding: 14px; margin-bottom: 14px; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
 
-  /* ====== 按钮通用 ====== */
   .btn { display: inline-block; border: none; border-radius: 10px; padding: 12px 18px; font-size: 15px; cursor: pointer; font-weight: 600; font-family: inherit; }
   .btn:disabled { opacity: .45; cursor: not-allowed; }
   .btn-sm { padding: 6px 12px; font-size: 13px; }
@@ -25,38 +24,19 @@
   .btn-info { background: #0dcaf0; color: #05323a; }
   .btn-dark { background: #343a40; color: #fff; }
 
-  /* ====== 按钮网格：整齐排列 ====== */
-  .btn-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-  }
+  .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .btn-grid .btn {
-    margin: 0;
-    width: 100%;
-    padding: 14px 8px;
-    font-size: 14px;
-    text-align: center;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    line-height: 1.2;
+    margin: 0; width: 100%; padding: 14px 8px; font-size: 14px;
+    text-align: center; white-space: nowrap; overflow: hidden;
+    text-overflow: ellipsis; line-height: 1.2;
   }
   .btn-grid .btn.span-2 { grid-column: 1 / -1; }
 
   #restoreBanner {
-    display: none;
-    background: #d1e7dd;
-    color: #0f5132;
-    border: 1px solid #a3cfbb;
-    border-radius: 10px;
-    padding: 10px 12px;
-    font-size: 13px;
-    line-height: 1.6;
-    margin-bottom: 14px;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
+    display: none; background: #d1e7dd; color: #0f5132;
+    border: 1px solid #a3cfbb; border-radius: 10px;
+    padding: 10px 12px; font-size: 13px; line-height: 1.6;
+    margin-bottom: 14px; align-items: center; gap: 8px; flex-wrap: wrap;
   }
   #restoreBanner .spacer { flex: 1; }
 
@@ -155,7 +135,6 @@
     <button class="btn btn-sm btn-danger" id="btnClearStorage">清除保存的数据</button>
   </div>
 
-  <!-- ====== 统一控制面板：所有按钮集中在这里，整齐网格排列 ====== -->
   <div class="card">
     <div class="btn-grid">
       <button class="btn btn-primary" id="btnUpload" disabled>Excel</button>
@@ -173,12 +152,10 @@
     </div>
   </div>
 
-  <!-- 摄像头画面 -->
   <div id="readerWrap">
     <div id="reader"></div>
   </div>
 
-  <!-- 统计 -->
   <div class="card" id="statCard" style="display:none">
     <div class="stats">
       <div class="stat">总数<b id="stTotal">0</b></div>
@@ -187,12 +164,10 @@
     </div>
   </div>
 
-  <!-- 日志 -->
   <div class="card" id="logCard">
     <div class="log" id="log"></div>
   </div>
 
-  <!-- 表格 -->
   <div class="card" id="tableCard" style="display:none">
     <div class="table-wrap"><table id="grid"></table></div>
     <span id="exportName" class="hint"></span>
@@ -270,9 +245,6 @@ let hasSavedData = false;
 let checkLog = [];
 const $ = id => document.getElementById(id);
 
-/* =========================================================
-   按钮显示控制
-   ========================================================= */
 function showDataButtons(show) {
   document.querySelectorAll(".need-data").forEach(el => {
     el.style.display = show ? "" : "none";
@@ -936,17 +908,21 @@ $("btnExportLog").onclick = async () => {
   } catch (err) { toast("导出失败", err.message); }
 };
 
-/* ===== 清除 ===== */
-$("btnClearStorage").onclick = async () => {
+/* =========================================================
+   清除保存的数据 —— 【关键修复】
+   改为非 async 函数，UI 立即响应，IndexedDB 删除放后台
+   ========================================================= */
+$("btnClearStorage").onclick = function() {
   if (!confirm("确定要清除已保存的表格、核对进度和运行日志吗？此操作不可恢复。")) return;
-  await deleteTableData();
-  await deleteLogFromDB();
-  clearMatched();
+
+  // 1. 立即重置内存状态（同步）
   hasSavedData = false;
   headers = []; rows = []; matchColIdx = -1;
   matchedSet = new Set(); codeIndex = new Map();
   checkLog = [];
   lastHitRow = -1; fileBase = "核对结果";
+
+  // 2. 立即更新 UI（同步）
   $("restoreBanner").style.display = "none";
   $("fileName").textContent = "";
   $("colBadge").style.display = "none";
@@ -957,6 +933,15 @@ $("btnClearStorage").onclick = async () => {
   $("readerWrap").style.display = "none";
   $("grid").innerHTML = "";
   $("log").innerHTML = "";
+  $("btnCamera").style.display = "none";
+  $("btnStop").style.display = "none";
+  $("btnUpload").disabled = false;  // 确保上传按钮可用
+
+  // 3. 后台异步删除数据库，不阻塞用户操作（关键）
+  try { deleteTableData(); } catch(e) {}
+  try { deleteLogFromDB(); } catch(e) {}
+  clearMatched();
+
   toast("已清除", "保存的数据已删除");
 };
 
