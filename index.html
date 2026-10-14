@@ -202,16 +202,16 @@
 
   <div class="card">
     <div class="btn-grid">
-      <button class="btn btn-primary" id="btnUpload" disabled>Excel</button>
+      <button class="btn btn-primary" id="btnUpload" disabled>上传Excel</button>
       <button class="btn btn-dark need-data" id="btnExportLog" style="display:none">运行日志</button>
 
       <button class="btn btn-secondary need-data" id="btnChangeCol" style="display:none">切换核对模式</button>
       <button class="btn btn-warning need-data" id="btnLocate" style="display:none">📍 定位最后核对项</button>
 
-      <button class="btn btn-info need-data" id="btnExport" style="display:none">导出全部</button>
-      <button class="btn btn-info need-data" id="btnExportMatched" style="display:none">已扫描</button>
+      <button class="btn btn-info need-data" id="btnExport" style="display:none">分享全部数据</button>
+      <button class="btn btn-info need-data" id="btnExportMatched" style="display:none">分享已扫描数据</button>
 
-      <button class="btn btn-success need-data span-2" id="btnCamera" style="display:none">摄像头</button>
+      <button class="btn btn-success need-data span-2" id="btnCamera" style="display:none">开始扫描</button>
       <button class="btn btn-danger span-2" id="btnStop" style="display:none">停止扫描</button>
     </div>
     <div style="margin-top:10px; min-height:18px;">
@@ -339,7 +339,7 @@ let hasSavedData = false;
 let checkLog = [];
 const $ = id => document.getElementById(id);
 
-/* ===== 平台检测（关键！）===== */
+/* ===== 平台检测 ===== */
 const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
                (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 console.log("[平台] iOS:", IS_IOS);
@@ -949,11 +949,10 @@ async function makeDetector(){
   return null;
 }
 
-/* ===== 关键：平台差异化约束 ===== */
+/* ===== 平台差异化约束 ===== */
 async function openCameraWithBestConstraints() {
   const base = { facingMode: { ideal: "environment" } };
 
-  // iOS 上使用最简约束，避免 PTZ/advanced 导致流不稳定
   if (IS_IOS) {
     console.log("[摄像头] iOS 平台，使用简化约束");
     const iosTries = [
@@ -975,7 +974,6 @@ async function openCameraWithBestConstraints() {
     throw lastErr || new Error("无法打开摄像头");
   }
 
-  // 安卓/PC：保留完整 PTZ 请求
   const ptzRequest = { zoom: true };
   const advancedFocus = [
     { focusMode: "continuous" },
@@ -1018,7 +1016,6 @@ async function openCameraWithBestConstraints() {
 async function tuneTrackAfterStart(track) {
   if(!track) return;
 
-  // iOS 上不主动 applyConstraints，避免干扰系统自动对焦
   if (IS_IOS) {
     console.log("[调优] iOS 平台跳过 applyConstraints");
     return;
@@ -1234,18 +1231,14 @@ function forceRestoreCameraUI() {
 function stopScan(){
   console.log("[stopScan] 开始");
 
-  // 1. 立即同步恢复 UI（最优先，纯 DOM 操作）
   forceRestoreCameraUI();
 
-  // 2. 复位标志位
   scanning = false;
   starting = false;
 
-  // 3. 清理定时器
   if (scanTimer) { clearTimeout(scanTimer); scanTimer = null; }
   if (window._focusInterval) { clearInterval(window._focusInterval); window._focusInterval = null; }
 
-  // 4. 保存引用后立即清空全局状态
   const oldStream = camStream;
   const oldVideo = camVideo;
   const oldScanner = scanner;
@@ -1254,7 +1247,6 @@ function stopScan(){
   camStream = null; camTrack = null; camVideo = null; nativeDetector = null;
   scanner = null; fallbackMode = false;
 
-  // 5. 立即移除 reader 内的 video 元素（同步，确保 iOS 释放摄像头）
   try {
     const readerEl = $("reader");
     readerEl.querySelectorAll("video").forEach(v => {
@@ -1264,7 +1256,6 @@ function stopScan(){
     });
   } catch(e){ console.warn("移除 video 元素失败", e); }
 
-  // 6. 后台异步释放资源（不阻塞，不 await）
   setTimeout(function() {
     try {
       if (oldStream) {
@@ -1290,7 +1281,6 @@ function stopScan(){
     }
   }, 30);
 
-  // 7. 兜底：800ms 后如果按钮状态还没恢复，强制恢复一次
   setTimeout(function() {
     try {
       if (!scanning && !starting) {
@@ -1333,7 +1323,6 @@ $("btnCamera").onclick = async () => {
   try{
     let ok = false;
     if("BarcodeDetector" in window && !IS_IOS){
-      // iOS 上 BarcodeDetector 兼容性差，直接走 Html5Qrcode
       try{ ok = await startNativeScan(); }
       catch(e){
         console.warn("原生扫码不可用，回退降级方案：", e);
@@ -1356,7 +1345,6 @@ $("btnCamera").onclick = async () => {
   }
 };
 
-/* 停止按钮：同步绑定 */
 $("btnStop").onclick = function() {
   console.log("[按钮] 停止扫描被点击");
   stopScan();
