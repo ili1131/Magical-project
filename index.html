@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>飞利浦收货核对</title>
+<title>飞利浦送货</title>
 <style>
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;margin:0;background:#f4f6f9;color:#1a1a2e}
@@ -127,7 +127,7 @@ td.matched{background:#ffe3e3 !important;color:#b02a37;font-weight:700}
 </div>
 
 <header>
-<h1>📦 飞利浦收货核对</h1>
+<h1>飞利浦送货</h1>
 <span class="badge" id="colBadge" style="display:none"></span>
 </header>
 
@@ -144,7 +144,7 @@ td.matched{background:#ffe3e3 !important;color:#b02a37;font-weight:700}
 <button class="btn btn-dark need-data" id="btnExportLog" style="display:none">运行日志</button>
 <button class="btn btn-secondary need-data" id="btnChangeCol" style="display:none">切换核对模式</button>
 <button class="btn btn-warning need-data" id="btnLocate" style="display:none">📍 定位最后核对项</button>
-<button class="btn btn-info need-data" id="btnExport" style="display:none">分享全部数据</button>
+<button class="btn btn-info need-data" id="btnExport" style="display:none">分享全部的数据</button>
 <button class="btn btn-info need-data" id="btnExportMatched" style="display:none">分享已扫描数据</button>
 <button class="btn btn-dark need-data span-2" id="btnVoice" style="display:none">🎤 语音识别条码</button>
 <button class="btn btn-success need-data span-2" id="btnCamera" style="display:none">开始扫描</button>
@@ -196,7 +196,7 @@ td.matched{background:#ffe3e3 !important;color:#b02a37;font-weight:700}
 <h3>🎤 语音识别条码</h3>
 <div class="voiceHint">
 📌 摄像头扫码：完全匹配（一字不差）<br>
-📌 语音识别：<strong>可以只读数字进行搜索匹配</strong><br>
+📌 语音识别：可以只读数字进行搜索匹配<br>
 💡 阿拉伯数字或中文数字均可，中间停顿不影响，说完等 1.5 秒自动结束
 </div>
 <div id="voiceStatus">准备中…</div>
@@ -522,7 +522,7 @@ if(navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.s
 const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=outName;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),5000);toast("已下载",outName)}
 catch(err){toast("导出失败",err.message)}}
 
-$("btnExport").onclick=()=>{if(!rows.length)return;buildAndShareExcel(rows.map((_,i)=>i),getTodayStr())};
+$("btnExport").onclick=()=>{if(!rows.length)return;buildAndShareExcel(rows.map((_,i)=>i),getTodayStr()+"全部明细")};
 $("btnExportMatched").onclick=()=>{if(!rows.length)return;if(matchedSet.size===0){toast("提示","还没有已核对的行可导出");return}const idxList=Array.from(matchedSet).sort((a,b)=>a-b);buildAndShareExcel(idxList,getTodayStr()+"已配送的明细")};
 $("btnExportLog").onclick=async()=>{if(typeof ExcelJS==="undefined"){toast("导出组件未加载完成","请稍后再试");return}if(!checkLog.length){toast("提示","还没有运行日志可导出");return}
 try{const wb=new ExcelJS.Workbook();const ws=wb.addWorksheet("核对日志");const headerRow=ws.addRow(["序号","时间","条码","核对结果","详细信息"]);headerRow.font={bold:true};
