@@ -318,23 +318,23 @@ function clearMatched() {
 
 /* =========================================================
    振动反馈
-   iOS Safari 不支持（会静默失败），安卓浏览器支持
    ========================================================= */
 function vibrate(type) {
   if (!navigator.vibrate) return;
   try {
     if (type === 'ok') {
-      navigator.vibrate(60);                // 短震
+      navigator.vibrate(60);
     } else if (type === 'dup') {
-      navigator.vibrate([80, 60, 80]);      // 双震
+      navigator.vibrate([80, 60, 80]);
     } else if (type === 'miss') {
-      navigator.vibrate([300, 100, 300, 100, 300]); // 三长震（强提示）
+      navigator.vibrate([300, 100, 300, 100, 300]);
     }
   } catch(e) {}
 }
 
 /* =========================================================
-   音频
+   音频 —— 【本次改动】音量全部拉满到 1.0（最大值）
+   成功/重复/失败/解锁全部 gain=1.0
    ========================================================= */
 let audioCtx = null;
 function ensureCtx() {
@@ -351,7 +351,9 @@ function playTone(ctx, freq, durationMs, volume, startTime) {
     o.type = 'sine';
     o.frequency.value = freq;
     o.connect(g); g.connect(ctx.destination);
-    g.gain.setValueAtTime(volume, startTime);
+    // 音量上限 1.0，超过会削波失真，所以直接封顶
+    const v = Math.min(volume, 1.0);
+    g.gain.setValueAtTime(v, startTime);
     g.gain.exponentialRampToValueAtTime(0.001, startTime + durationMs / 1000);
     o.start(startTime);
     o.stop(startTime + durationMs / 1000);
@@ -360,7 +362,7 @@ function playTone(ctx, freq, durationMs, volume, startTime) {
 function initAudioAndUnlock() {
   const ctx = ensureCtx();
   if (!ctx) return;
-  const fire = () => { playTone(ctx, 1500, 130, 0.35, ctx.currentTime); };
+  const fire = () => { playTone(ctx, 1500, 130, 1.0, ctx.currentTime); };  // 1.0 满音量
   if (ctx.state === 'suspended') { ctx.resume().then(fire).catch(fire); }
   else { fire(); }
 }
@@ -370,14 +372,14 @@ function playBeep(type) {
   const fire = () => {
     const now = ctx.currentTime;
     if (type === 'ok') {
-      playTone(ctx, 1500, 120, 0.4, now);
-      playTone(ctx, 2000, 130, 0.4, now + 0.14);
+      playTone(ctx, 1500, 120, 1.0, now);          // 满音量
+      playTone(ctx, 2000, 130, 1.0, now + 0.14);   // 满音量
     } else if (type === 'dup') {
-      playTone(ctx, 1000, 60, 0.35, now);
-      playTone(ctx, 1000, 60, 0.35, now + 0.1);
-      playTone(ctx, 1000, 60, 0.35, now + 0.2);
+      playTone(ctx, 1000, 60, 1.0, now);           // 满音量
+      playTone(ctx, 1000, 60, 1.0, now + 0.1);     // 满音量
+      playTone(ctx, 1000, 60, 1.0, now + 0.2);     // 满音量
     } else if (type === 'miss') {
-      playTone(ctx, 400, 500, 0.45, now);
+      playTone(ctx, 400, 500, 1.0, now);           // 满音量
     }
   };
   if (ctx.state === 'suspended') { ctx.resume().then(fire).catch(fire); }
@@ -636,7 +638,7 @@ function check(code){
     logMsg("miss", ts + " ❌ 未在表格中找到：" + code);
     addLog(code, "失败", "未在表格中找到");
     playBeep('miss');
-    vibrate('miss');  // 强烈三长震，不看屏幕也能感觉到
+    vibrate('miss');
     speak("不可配送，需滞留");
     toast("❌ 不可配送，需滞留", "未在表格中找到：" + code);
   }
