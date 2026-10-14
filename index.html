@@ -51,6 +51,15 @@
   .scan-frame::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 2px; background: rgba(255,80,80,.85); animation: scanline 2s ease-in-out infinite; }
   @keyframes scanline { 0%,100% { top: 8%; } 50% { top: 92%; } }
 
+  /* 对焦提示浮层 */
+  .focus-toast {
+    position: absolute;
+    bottom: 8px; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,.65); color: #fff;
+    padding: 5px 12px; border-radius: 14px; font-size: 12px;
+    pointer-events: none; z-index: 15; white-space: nowrap;
+  }
+
   #logCard { display: none; }
   .log { max-height: 180px; overflow-y: auto; font-size: 13px; }
   .log .ok { color: #198754; }
@@ -137,19 +146,15 @@
 
   <div class="card">
     <div class="btn-grid">
-      <!-- 第 1 行：Excel | 运行日志（与原来摄像头位置互换） -->
       <button class="btn btn-primary" id="btnUpload" disabled>Excel</button>
       <button class="btn btn-dark need-data" id="btnExportLog" style="display:none">运行日志</button>
 
-      <!-- 第 2 行 -->
       <button class="btn btn-secondary need-data" id="btnChangeCol" style="display:none">更换核对列</button>
       <button class="btn btn-warning need-data" id="btnLocate" style="display:none">📍 定位最后核对项</button>
 
-      <!-- 第 3 行 -->
       <button class="btn btn-info need-data" id="btnExport" style="display:none">导出全部</button>
       <button class="btn btn-info need-data" id="btnExportMatched" style="display:none">已扫描</button>
 
-      <!-- 第 4 行：摄像头 / 停止扫描，跨 2 列，占据底部整行 -->
       <button class="btn btn-success need-data span-2" id="btnCamera" style="display:none">摄像头</button>
       <button class="btn btn-danger span-2" id="btnStop" style="display:none">停止扫描</button>
     </div>
@@ -329,18 +334,14 @@ function clearMatched() {
 function vibrate(type) {
   if (!navigator.vibrate) return;
   try {
-    if (type === 'ok') {
-      navigator.vibrate(60);
-    } else if (type === 'dup') {
-      navigator.vibrate([80, 60, 80]);
-    } else if (type === 'miss') {
-      navigator.vibrate([300, 100, 300, 100, 300]);
-    }
+    if (type === 'ok') navigator.vibrate(60);
+    else if (type === 'dup') navigator.vibrate([80, 60, 80]);
+    else if (type === 'miss') navigator.vibrate([300, 100, 300, 100, 300]);
   } catch(e) {}
 }
 
 /* =========================================================
-   音频（音量已全部拉满 1.0）
+   音频（音量拉满）
    ========================================================= */
 let audioCtx = null;
 function ensureCtx() {
@@ -489,7 +490,6 @@ function pickFile() {
 
       pickColumn(-1, function(idx) {
         matchColIdx = idx;
-
         $("colBadge").style.display = "inline";
         $("colBadge").textContent = "核对列：" + (headers[idx] || "第" + (idx + 1) + "列");
 
@@ -528,7 +528,6 @@ function pickFile() {
   inp.click();
 }
 
-/* 更换核对列 */
 $("btnChangeCol").onclick = () => {
   if (!headers.length) return;
   if (!confirm("更换核对列会清空当前核对进度，是否继续？")) return;
@@ -587,7 +586,6 @@ function getRowInfo(rowIndex) {
   return parts.join(" | ");
 }
 
-/* ===== 定位 ===== */
 $("btnLocate").onclick = () => {
   if (lastHitRow < 0) { toast("提示", "还没有成功核对任何项目"); return; }
   const wrap = document.querySelector(".table-wrap");
@@ -628,29 +626,25 @@ function check(code){
     saveMatched();
     const info = getRowInfo(hit);
     addLog(code, "成功", info);
-    playBeep('ok');
-    vibrate('ok');
-    speak("可以配送");
+    playBeep('ok'); vibrate('ok'); speak("可以配送");
     toast("✅ 已核对 · 可以配送", info);
   } else if(dup){
     logMsg("dup", ts + " ⚠️ 重复扫描：" + code);
     addLog(code, "重复", "该条码已核对过");
-    playBeep('dup');
-    vibrate('dup');
-    speak("重复扫描");
+    playBeep('dup'); vibrate('dup'); speak("重复扫描");
     toast("⚠️ 重复扫描", "该条码已核对过：" + code);
   } else {
     logMsg("miss", ts + " ❌ 未在表格中找到：" + code);
     addLog(code, "失败", "未在表格中找到");
-    playBeep('miss');
-    vibrate('miss');
-    speak("不可配送，需滞留");
+    playBeep('miss'); vibrate('miss'); speak("不可配送，需滞留");
     toast("❌ 不可配送，需滞留", "未在表格中找到：" + code);
   }
   if(matchedSet.size === rows.length && rows.length) speak("核对完成");
 }
 
-/* ===== 扫码 ===== */
+/* =========================================================
+   扫码（本次核心优化）
+   ========================================================= */
 let camStream = null, camTrack = null, camVideo = null;
 let nativeDetector = null, scanning = false, starting = false;
 let scanTimer = null, loopBusy = false;
@@ -677,15 +671,102 @@ async function makeDetector(){
   }catch(e){}
   return null;
 }
-async function tuneTrack(track){
-  if(!track) return;
-  const caps = (track.getCapabilities ? track.getCapabilities() : {}) || {};
-  const adv = [];
-  if(Array.isArray(caps.focusMode) && caps.focusMode.includes("continuous")) adv.push({ focusMode: "continuous" });
-  if(Array.isArray(caps.exposureMode) && caps.exposureMode.includes("continuous")) adv.push({ exposureMode: "continuous" });
-  if(adv.length){ try{ await track.applyConstraints({ advanced: adv }); }catch(e){} }
-  try{ await track.applyConstraints({ width: { ideal: 3840 }, height: { ideal: 2160 } }); }catch(e){}
+
+/* 尝试用多套约束方案打开摄像头，带连续自动对焦 */
+async function openCameraWithBestConstraints() {
+  // 基础约束：后置摄像头
+  const base = { facingMode: { ideal: "environment" } };
+  // 把对焦等约束直接写进 getUserMedia，浏览器更容易在启动时就启用
+  const advancedFocus = [
+    { focusMode: "continuous" },
+    { exposureMode: "continuous" },
+    { whiteBalanceMode: "continuous" }
+  ];
+
+  // 逐级降级的配置列表（从最优到兜底）
+  const tries = [
+    // 1. 1080p + 连续对焦（最优先，清晰度和性能平衡最好）
+    { audio:false, video: Object.assign({}, base, {
+        width:  { ideal: 1920 },
+        height: { ideal: 1080 },
+        frameRate: { ideal: 30 },
+        advanced: advancedFocus
+    })},
+    // 2. 720p + 连续对焦
+    { audio:false, video: Object.assign({}, base, {
+        width:  { ideal: 1280 },
+        height: { ideal: 720 },
+        frameRate: { ideal: 30 },
+        advanced: advancedFocus
+    })},
+    // 3. 720p（去掉 advanced，兼容拒绝 advanced 的浏览器）
+    { audio:false, video: Object.assign({}, base, {
+        width:  { ideal: 1280 },
+        height: { ideal: 720 }
+    })},
+    // 4. 480p 兜底
+    { audio:false, video: Object.assign({}, base, {
+        width:  { ideal: 640 },
+        height: { ideal: 480 }
+    })},
+    // 5. 最简
+    { audio:false, video: base }
+  ];
+
+  let stream = null, lastErr = null;
+  for (let i = 0; i < tries.length; i++) {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia(tries[i]);
+      console.log("[摄像头] 成功使用第 " + (i+1) + " 套约束");
+      return stream;
+    } catch(e) {
+      lastErr = e;
+      console.warn("[摄像头] 第 " + (i+1) + " 套约束失败：", e.name || e.message);
+    }
+  }
+  throw lastErr || new Error("无法打开摄像头");
 }
+
+/* 启动后再尝试补救对焦/变焦（有些浏览器只能在 track 起来后设置） */
+async function tuneTrackAfterStart(track) {
+  if(!track) return;
+  try {
+    const caps = (track.getCapabilities ? track.getCapabilities() : {}) || {};
+    console.log("[摄像头] 能力：", caps);
+
+    // 1. 连续对焦
+    if (Array.isArray(caps.focusMode) && caps.focusMode.includes("continuous")) {
+      try { await track.applyConstraints({ advanced: [{ focusMode: "continuous" }] }); }
+      catch(e) { console.warn("连续对焦设置失败", e); }
+    } else if (Array.isArray(caps.focusMode) && caps.focusMode.length) {
+      // 退而求其次：用单次对焦，然后每秒触发一次
+      try { await track.applyConstraints({ advanced: [{ focusMode: "single-shot" }] }); } catch(e){}
+      // 定时强制重新对焦（模拟连续对焦）
+      setInterval(() => {
+        try { track.applyConstraints({ advanced: [{ focusMode: "single-shot" }] }); } catch(e){}
+      }, 1500);
+    }
+
+    // 2. 连续曝光
+    if (Array.isArray(caps.exposureMode) && caps.exposureMode.includes("continuous")) {
+      try { await track.applyConstraints({ advanced: [{ exposureMode: "continuous" }] }); } catch(e){}
+    }
+
+    // 3. 如果支持变焦，尝试 1.2x ~ 1.5x，让条码在画面里更大
+    if (caps.zoom) {
+      const zmin = caps.zoom.min || 1;
+      const zmax = caps.zoom.max || 1;
+      const z = Math.min(zmax, Math.max(zmin, 1.3));
+      if (z > zmin) {
+        try { await track.applyConstraints({ advanced: [{ zoom: z }] }); }
+        catch(e) { console.warn("变焦设置失败", e); }
+      }
+    }
+  } catch(e) {
+    console.warn("tuneTrackAfterStart 出错：", e);
+  }
+}
+
 async function startNativeScan(){
   const det = await makeDetector();
   if(!det) throw new Error("no-native-detector");
@@ -704,40 +785,53 @@ async function startNativeScan(){
   overlay.className = "scan-frame";
   container.appendChild(overlay);
 
-  let stream = null, lastErr = null;
-  try {
-    stream = await navigator.mediaDevices.getUserMedia({
-      audio: false,
-      video: { facingMode: { ideal: "environment" }, width: { ideal: 3840 }, height: { ideal: 2160 }, frameRate: { ideal: 30 } }
-    });
-  } catch(e) {
-    lastErr = e;
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        audio: false, video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } }
-      });
-    } catch(e2) { lastErr = e2; }
-  }
-  if(!stream) throw lastErr || new Error("无法打开摄像头");
+  // 对焦提示
+  const hint = document.createElement("div");
+  hint.className = "focus-toast";
+  hint.textContent = "点击画面可手动对焦";
+  hint.style.display = "none";
+  container.appendChild(hint);
 
+  // 打开摄像头
+  const stream = await openCameraWithBestConstraints();
   video.srcObject = stream;
   camStream = stream;
   camTrack = stream.getVideoTracks()[0];
   await video.play();
-  await tuneTrack(camTrack);
 
+  // 启动后补救对焦 / 变焦
+  await tuneTrackAfterStart(camTrack);
+
+  // 点击画面对焦
   video.addEventListener("click", async ev => {
     if(!camTrack || !camTrack.getCapabilities) return;
     const caps = camTrack.getCapabilities();
-    if(!caps.pointsOfInterest) return;
     const rect = video.getBoundingClientRect();
-    const x = (ev.clientX - rect.left) / rect.width;
-    const y = (ev.clientY - rect.top) / rect.height;
-    try{
-      await camTrack.applyConstraints({ advanced: [{ pointsOfInterest: [{ x, y }] }, { focusMode: "single-shot" }] });
-      setTimeout(()=>{ try{ camTrack.applyConstraints({ advanced:[{ focusMode:"continuous" }] }); }catch(e){} }, 2000);
-    }catch(e){}
+
+    // 优先使用 pointsOfInterest（部分设备支持）
+    if (caps.pointsOfInterest) {
+      const x = (ev.clientX - rect.left) / rect.width;
+      const y = (ev.clientY - rect.top) / rect.height;
+      try{
+        await camTrack.applyConstraints({ advanced: [
+          { pointsOfInterest: [{ x, y }] },
+          { focusMode: "single-shot" }
+        ]});
+        setTimeout(()=>{ try{ camTrack.applyConstraints({ advanced:[{ focusMode:"continuous" }] }); }catch(e){} }, 2000);
+        return;
+      }catch(e){}
+    }
+    // 退而求其次：触发一次单次对焦
+    if (Array.isArray(caps.focusMode) && caps.focusMode.length) {
+      try {
+        await camTrack.applyConstraints({ advanced: [{ focusMode: "single-shot" }] });
+        setTimeout(()=>{ try{ camTrack.applyConstraints({ advanced:[{ focusMode:"continuous" }] }); }catch(e){} }, 2000);
+      } catch(e){}
+    }
   });
+
+  // 3 秒后显示提示（让用户知道可以对焦）
+  setTimeout(()=>{ hint.style.display = "block"; }, 3000);
 
   nativeDetector = det;
   camVideo = video;
@@ -745,6 +839,7 @@ async function startNativeScan(){
   scanLoop();
   return true;
 }
+
 async function scanLoop(){
   if(!scanning || !nativeDetector || !camVideo) return;
   if(!loopBusy && camVideo.readyState >= 2 && camVideo.videoWidth > 0){
@@ -759,6 +854,7 @@ async function scanLoop(){
   }
   scanTimer = setTimeout(scanLoop, 80);
 }
+
 async function startFallbackScan(){
   if(typeof Html5Qrcode === "undefined") throw new Error("扫码库未加载");
   fallbackMode = true;
@@ -774,17 +870,20 @@ async function startFallbackScan(){
   await boostStreamResolution();
   scanning = true;
 }
+
 async function boostStreamResolution(){
   const v = $("reader").querySelector("video");
   if(!v || !v.srcObject) return;
   const t = v.srcObject.getVideoTracks()[0];
   if(!t) return;
-  try{ await t.applyConstraints({ width: { ideal: 1920 }, height: { ideal: 1080 }, advanced: [{ focusMode: "continuous" }] }); }catch(e){}
+  await tuneTrackAfterStart(t);
 }
+
 function stopCamStream(){
   if(camStream){ try{ camStream.getTracks().forEach(t => t.stop()); }catch(e){} }
   camStream = null; camTrack = null; camVideo = null; nativeDetector = null;
 }
+
 async function stopScan(){
   scanning = false;
   if(scanTimer){ clearTimeout(scanTimer); scanTimer = null; }
@@ -800,6 +899,7 @@ async function stopScan(){
   $("btnCamera").style.display = "";
   $("btnStop").style.display = "none";
 }
+
 function cameraErrText(e){
   const name = (e && e.name) || "";
   const raw  = (e && e.message) ? e.message : String(e || "");
