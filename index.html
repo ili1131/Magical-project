@@ -528,7 +528,6 @@ function pickColumn(currentIdx, callback) {
   const list = $("colPickerList");
   list.innerHTML = "";
 
-  // 全部列选项
   const allBtn = document.createElement("button");
   allBtn.className = "colPickBtn allBtn" + (currentIdx === -1 ? " current" : "");
   allBtn.innerHTML = '<span class="idx">ALL</span>全部列（核对整表所有单元格）';
@@ -803,69 +802,58 @@ function showCamStatus(track) {
 }
 
 /* =========================================================
-   点击对焦：四级降级尝试
+   点击对焦：针对 Android 优化的务实方案
    ========================================================= */
 async function tryFocusAtPoint(track, x, y) {
   if (!track) return false;
   const caps = (track.getCapabilities ? track.getCapabilities() : {}) || {};
-  console.log("[对焦] 点击坐标:", x.toFixed(2), y.toFixed(2), "能力:", caps);
-
   const settings = track.getSettings();
   const baseConstraints = {
     width: settings.width || { ideal: 1920 },
     height: settings.height || { ideal: 1080 }
   };
 
-  // 方法1: pointsOfInterest + single-shot
-  if (Array.isArray(caps.pointsOfInterest)) {
+  console.log("[对焦] 尝试对焦，当前对焦能力:", caps.focusMode);
+
+  // 方案1：强制切回 continuous 模式（这是解决 manual 卡死的最佳方法）
+  if (Array.isArray(caps.focusMode) && caps.focusMode.includes('continuous')) {
     try {
-      await track.applyConstraints(Object.assign({}, baseConstraints, {
-        advanced: [
-          { pointsOfInterest: [{ x, y }] },
-          { focusMode: 'single-shot' }
-        ]
-      }));
-      console.log("[对焦] ✓ 方法1成功：pointsOfInterest 精确对焦");
-      setTimeout(() => {
-        if (Array.isArray(caps.focusMode) && caps.focusMode.includes('continuous')) {
-          try { track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }); } catch(e){}
-        }
-      }, 2000);
+      await track.applyConstraints(Object.assign({}, baseConstraints, { advanced: [{ focusMode: 'continuous' }] }));
+      console.log("[对焦] ✓ 已切回连续自动对焦");
       return true;
-    } catch(e) { console.warn("[对焦] 方法1失败:", e.name || e.message); }
+    } catch(e) { console.warn("切回 continuous 失败", e); }
   }
 
-  // 方法2: single-shot 全画面重对焦
+  // 方案2：触发 single-shot 单次对焦
   if (Array.isArray(caps.focusMode) && caps.focusMode.includes('single-shot')) {
     try {
       await track.applyConstraints(Object.assign({}, baseConstraints, { advanced: [{ focusMode: 'single-shot' }] }));
-      console.log("[对焦] ✓ 方法2成功：single-shot 全画面重对焦");
+      console.log("[对焦] ✓ 已触发单次对焦");
+      // 延迟切回 continuous，防止卡死
       setTimeout(() => {
         if (Array.isArray(caps.focusMode) && caps.focusMode.includes('continuous')) {
           try { track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }); } catch(e){}
         }
       }, 2000);
       return true;
-    } catch(e) { console.warn("[对焦] 方法2失败:", e.name || e.message); }
+    } catch(e) { console.warn("单次对焦失败", e); }
   }
 
-  // 方法3: manual → continuous 切换
-  if (Array.isArray(caps.focusMode) && caps.focusMode.includes('manual')) {
+  // 方案3：变焦微调触发系统重对焦（非常有效的一招）
+  if (caps.zoom && caps.zoom.max > caps.zoom.min) {
     try {
-      await track.applyConstraints(Object.assign({}, baseConstraints, { advanced: [{ focusMode: 'manual' }] }));
+      const currentZoom = track.getSettings().zoom || caps.zoom.min;
+      const bump = Math.min(caps.zoom.max, currentZoom + 0.1);
+      await track.applyConstraints({ zoom: bump });
       setTimeout(() => {
-        if (Array.isArray(caps.focusMode) && caps.focusMode.includes('continuous')) {
-          try { track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }); } catch(e){}
-        } else if (Array.isArray(caps.focusMode) && caps.focusMode.includes('single-shot')) {
-          try { track.applyConstraints({ advanced: [{ focusMode: 'single-shot' }] }); } catch(e){}
-        }
-      }, 800);
-      console.log("[对焦] ✓ 方法3成功：manual 切换触发重对焦");
+        try { track.applyConstraints({ zoom: currentZoom }); } catch(e){}
+      }, 200);
+      console.log("[对焦] ✓ 已通过变焦微调触发重对焦");
       return true;
-    } catch(e) { console.warn("[对焦] 方法3失败:", e.name || e.message); }
+    } catch(e) { console.warn("变焦微调失败", e); }
   }
 
-  console.warn("[对焦] ✗ 所有方法都失败");
+  console.warn("[对焦] ✗ 所有对焦方案均失败");
   return false;
 }
 
@@ -959,9 +947,10 @@ async function tuneTrackAfterStart(track) {
   try {
     const caps = (track.getCapabilities ? track.getCapabilities() : {}) || {};
 
+    // 优先强制连续自动对焦
     if (Array.isArray(caps.focusMode) && caps.focusMode.includes("continuous")) {
       try { await track.applyConstraints({ advanced: [{ focusMode: "continuous" }] }); }
-      catch(e) {}
+      catch(e) { console.warn("初始连续对焦设置失败", e); }
     } else if (Array.isArray(caps.focusMode) && caps.focusMode.length) {
       try { await track.applyConstraints({ advanced: [{ focusMode: "single-shot" }] }); } catch(e){}
       if (window._focusInterval) clearInterval(window._focusInterval);
@@ -1051,7 +1040,7 @@ async function startNativeScan(){
     const y = (ev.clientY - rect.top) / rect.height;
     const ok = await tryFocusAtPoint(camTrack, x, y);
     if (!ok) {
-      toast("提示", "当前设备或浏览器不支持网页手动对焦");
+      toast("提示", "当前设备或浏览器不支持网页手动对焦，请滑动变焦滑块试试");
     }
   });
 
@@ -1188,7 +1177,6 @@ async function buildAndShareExcel(rowIdxList, outBaseName) {
     rowIdxList.forEach(i => {
       const r = rows[i] || [];
       const row = ws.addRow(headers.map((_, j) => r[j] ?? ""));
-      // 只给命中的单元格上色
       headers.forEach((_, j) => {
         if (matchedCells.has(i + "-" + j)) {
           const cell = row.getCell(j + 1);
@@ -1346,7 +1334,6 @@ async function tryRestore() {
       return;
     }
 
-    // 恢复单元格级进度
     matchedCells = new Set(loadMatchedCells());
     rebuildMatchedSetFromCells();
 
