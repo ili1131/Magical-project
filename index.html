@@ -197,12 +197,11 @@ let sheetName = "", headers = [], rows = [];
 let matchColIdx = -1, matchedSet = new Set(), codeIndex = new Map();
 let fileBase = "核对结果";
 let lastHitRow = -1;
+let hasSavedData = false;  // 缓存"是否有旧数据"，避免点击时异步查询
 const $ = id => document.getElementById(id);
 
 /* =========================================================
-   持久化存储
-   - 表格本体：IndexedDB（异步、大容量、不阻塞主线程）
-   - 已核对行号：localStorage（数据量小，够用）
+   IndexedDB 工具：存表格数据
    ========================================================= */
 const DB_NAME = 'philips_check_db';
 const DB_VERSION = 1;
@@ -251,7 +250,7 @@ function deleteTableData() {
     tx.objectStore(DB_STORE).delete('main');
     tx.oncomplete = () => resolve(true);
     tx.onerror = () => reject(tx.error);
-  })).catch(e => { return false; });
+  })).catch(e => false);
 }
 
 function saveMatched() {
@@ -269,67 +268,10 @@ function clearMatched() {
   try { localStorage.removeItem(KEY_MATCHED); } catch(e) {}
 }
 
-/* 恢复流程 */
-async function tryRestore() {
-  try {
-    const data = await loadTableData();
-    if (!data || !data.rows || !data.rows.length) return false;
-
-    headers = data.headers || [];
-    rows = data.rows || [];
-    matchColIdx = data.matchColIdx;
-    sheetName = data.sheetName || "核对结果";
-    fileBase = data.fileBase || "核对结果";
-
-    if (matchColIdx < 0 || matchColIdx >= headers.length) return false;
-
-    const matchedArr = loadMatched();
-    matchedSet = new Set(matchedArr);
-    lastHitRow = matchedArr.length ? Math.max.apply(null, matchedArr) : -1;
-
-    $("fileName").textContent = "（已恢复）" + fileBase + ".xlsx";
-    $("colBadge").style.display = "inline";
-    $("colBadge").textContent = "核对列：" + headers[matchColIdx];
-
-    buildIndex();
-    renderTable();
-    updateStats();
-
-    $("scanCard").style.display = "block";
-    $("tableCard").style.display = "block";
-
-    $("restoreText").innerHTML = "💾 已恢复上次核对进度（" + matchedSet.size + "/" + rows.length + " 已核对）";
-    $("restoreBanner").style.display = "flex";
-    return true;
-  } catch(e) {
-    console.warn("恢复数据失败", e);
-    return false;
-  }
-}
-
-$("btnClearStorage").onclick = async () => {
-  if (!confirm("确定要清除已保存的表格和核对进度吗？此操作不可恢复。")) return;
-  await deleteTableData();
-  clearMatched();
-  headers = []; rows = []; matchColIdx = -1;
-  matchedSet = new Set(); codeIndex = new Map();
-  lastHitRow = -1; fileBase = "核对结果";
-  $("restoreBanner").style.display = "none";
-  $("fileName").textContent = "";
-  $("colBadge").style.display = "none";
-  $("scanCard").style.display = "none";
-  $("statCard").style.display = "none";
-  $("tableCard").style.display = "none";
-  $("grid").innerHTML = "";
-  $("log").innerHTML = "";
-  toast("已清除", "保存的数据已删除");
-};
-
 /* =========================================================
-   音频（Web Audio API 生成音效，Safari 兼容）
+   音频（Web Audio API）
    ========================================================= */
 let audioCtx = null;
-
 function ensureCtx() {
   if (!audioCtx) {
     const AC = window.AudioContext || window.webkitAudioContext;
@@ -337,7 +279,6 @@ function ensureCtx() {
   }
   return audioCtx;
 }
-
 function playTone(ctx, freq, durationMs, volume, startTime) {
   try {
     const o = ctx.createOscillator();
@@ -349,9 +290,8 @@ function playTone(ctx, freq, durationMs, volume, startTime) {
     g.gain.exponentialRampToValueAtTime(0.001, startTime + durationMs / 1000);
     o.start(startTime);
     o.stop(startTime + durationMs / 1000);
-  } catch(e) { console.warn("playTone failed", e); }
+  } catch(e) {}
 }
-
 function initAudioAndUnlock() {
   const ctx = ensureCtx();
   if (!ctx) return;
@@ -359,7 +299,6 @@ function initAudioAndUnlock() {
   if (ctx.state === 'suspended') { ctx.resume().then(fire).catch(fire); }
   else { fire(); }
 }
-
 function playBeep(type) {
   const ctx = ensureCtx();
   if (!ctx) return;
@@ -379,7 +318,6 @@ function playBeep(type) {
   if (ctx.state === 'suspended') { ctx.resume().then(fire).catch(fire); }
   else { fire(); }
 }
-
 function speak(text){
   try{
     if (!window.speechSynthesis) return;
@@ -421,26 +359,28 @@ function esc(s){
   return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 }
 
-/* ===== 上传解析 ===== */
+/* =========================================================
+   【核心修复】上传按钮：同步打开文件选择框
+   ========================================================= */
 $("btnUpload").onclick = () => {
-  // 检查是否有保存的数据
-  loadTableData().then(existing => {
-    if (existing && existing.rows && existing.rows.length) {
-      if (!confirm("检测到上次保存的核对数据。\n\n上传新表格会覆盖旧数据，是否继续？\n\n（如果你想保留旧数据，点取消）")) {
-        return;
-      }
+  // 用缓存的 hasSavedData 做同步判断（Safari 要求 input.click() 必须在同步栈里）
+  if (hasSavedData) {
+    if (!confirm("检测到上次保存的核对数据。\n\n上传新表格会覆盖旧数据，是否继续？\n\n（如果想保留旧数据，点取消）")) {
+      return;
     }
-    pickFile();
-  }).catch(() => { pickFile(); });
+  }
+  pickFile();  // 同步调用，Safari 才会弹出文件框
 };
 
 function pickFile() {
   const inp = document.createElement("input");
-  inp.type = "file"; inp.accept = ".xlsx,.xls,.csv";
+  inp.type = "file";
+  inp.accept = ".xlsx,.xls,.csv";
   inp.onchange = async e => {
-    const f = e.target.files[0]; if(!f) return;
+    const f = e.target.files[0];
+    if (!f) return;
     $("fileName").textContent = f.name;
-    fileBase = f.name.replace(/\.[^.]+$/,"");
+    fileBase = f.name.replace(/\.[^.]+$/, "");
     $("uploadBusy").style.display = "inline";
     $("btnUpload").disabled = true;
 
@@ -452,13 +392,13 @@ function pickFile() {
       sheetName = wb.SheetNames[0];
       const ws = wb.Sheets[sheetName];
       const arr = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "", raw: true });
-      if(!arr.length){ toast("提示", "表格为空"); return; }
+      if (!arr.length) { toast("提示", "表格为空"); return; }
 
       headers = arr[0].map(h => String(h).trim());
       rows = arr.slice(1).filter(r => r.some(c => String(c).trim() !== ""));
       matchColIdx = headers.findIndex(h => h.toUpperCase() === "RML/RMD");
-      if(matchColIdx < 0) matchColIdx = headers.findIndex(h => h.replace(/\s/g,"").toUpperCase().includes("RML"));
-      if(matchColIdx < 0){ toast("提示", "未找到 RML/RMD 列，请检查表头"); return; }
+      if (matchColIdx < 0) matchColIdx = headers.findIndex(h => h.replace(/\s/g, "").toUpperCase().includes("RML"));
+      if (matchColIdx < 0) { toast("提示", "未找到 RML/RMD 列，请检查表头"); return; }
 
       $("colBadge").style.display = "inline";
       $("colBadge").textContent = "核对列：" + headers[matchColIdx];
@@ -473,10 +413,9 @@ function pickFile() {
       $("scanCard").style.display = "block";
       $("tableCard").style.display = "block";
 
-      // 界面已经先渲染完了，下一步是后台异步保存
+      // 界面已经渲染好了，异步后台保存
       toast("已读取 " + rows.length + " 行数据", "正在后台保存进度…");
 
-      // 异步保存到 IndexedDB（不阻塞界面）
       saveTableData({
         headers: headers,
         rows: rows,
@@ -485,6 +424,7 @@ function pickFile() {
         fileBase: fileBase,
         savedAt: Date.now()
       }).then(ok => {
+        hasSavedData = ok;
         if (ok) {
           toast("已读取 " + rows.length + " 行数据", "✅ 进度已保存，可放心关闭");
         } else {
@@ -492,7 +432,7 @@ function pickFile() {
         }
       });
 
-    } catch(err) {
+    } catch (err) {
       console.error(err);
       toast("读取失败", String(err && err.message || err));
     } finally {
@@ -527,7 +467,6 @@ function updateStats(){
   $("stDone").textContent = matchedSet.size;
   $("stLeft").textContent = rows.length - matchedSet.size;
 }
-
 function getRowInfo(rowIndex) {
   const rowData = rows[rowIndex] || [];
   const parts = [];
@@ -567,7 +506,7 @@ function check(code){
     lastHitRow = hit;
     logMsg("ok", ts + " ✅ 匹配成功：" + code);
     renderTable(); updateStats();
-    saveMatched(); // 每核对成功一个立即保存（小数据，很快）
+    saveMatched(); // 每核对成功立即保存
 
     playBeep('ok');
     speak("可以配送");
@@ -760,7 +699,6 @@ function cameraErrText(e){
 
 $("btnCamera").onclick = async () => {
   if(scanning || starting) return;
-
   initAudioAndUnlock();
 
   if(!hasGetUserMedia()){
@@ -834,8 +772,69 @@ $("btnExport").onclick = async () => {
   }catch(err){ toast("导出失败", err.message); }
 };
 
-/* ===== 页面加载后尝试恢复上次数据（异步，不阻塞界面） ===== */
-setTimeout(function(){ tryRestore(); }, 200);
+/* ===== 清除保存的数据 ===== */
+$("btnClearStorage").onclick = async () => {
+  if (!confirm("确定要清除已保存的表格和核对进度吗？此操作不可恢复。")) return;
+  await deleteTableData();
+  clearMatched();
+  hasSavedData = false;
+  headers = []; rows = []; matchColIdx = -1;
+  matchedSet = new Set(); codeIndex = new Map();
+  lastHitRow = -1; fileBase = "核对结果";
+  $("restoreBanner").style.display = "none";
+  $("fileName").textContent = "";
+  $("colBadge").style.display = "none";
+  $("scanCard").style.display = "none";
+  $("statCard").style.display = "none";
+  $("tableCard").style.display = "none";
+  $("grid").innerHTML = "";
+  $("log").innerHTML = "";
+  toast("已清除", "保存的数据已删除");
+};
+
+/* =========================================================
+   页面加载后异步恢复
+   ========================================================= */
+async function tryRestore() {
+  try {
+    const data = await loadTableData();
+    if (!data || !data.rows || !data.rows.length) { hasSavedData = false; return; }
+
+    hasSavedData = true;
+
+    headers = data.headers || [];
+    rows = data.rows || [];
+    matchColIdx = data.matchColIdx;
+    sheetName = data.sheetName || "核对结果";
+    fileBase = data.fileBase || "核对结果";
+
+    if (matchColIdx < 0 || matchColIdx >= headers.length) return;
+
+    const matchedArr = loadMatched();
+    matchedSet = new Set(matchedArr);
+    lastHitRow = matchedArr.length ? Math.max.apply(null, matchedArr) : -1;
+
+    $("fileName").textContent = "（已恢复）" + fileBase + ".xlsx";
+    $("colBadge").style.display = "inline";
+    $("colBadge").textContent = "核对列：" + headers[matchColIdx];
+
+    buildIndex();
+    renderTable();
+    updateStats();
+
+    $("scanCard").style.display = "block";
+    $("tableCard").style.display = "block";
+
+    $("restoreText").innerHTML = "💾 已恢复上次核对进度（" + matchedSet.size + "/" + rows.length + " 已核对）";
+    $("restoreBanner").style.display = "flex";
+  } catch(e) {
+    console.warn("恢复数据失败", e);
+    hasSavedData = false;
+  }
+}
+
+// 页面加载后异步查询一次，缓存结果
+setTimeout(tryRestore, 300);
 </script>
 </body>
 </html>
