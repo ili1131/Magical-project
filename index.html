@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>飞利浦送货核对工具</title>
+<title>飞利浦收货核对</title>
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; margin: 0; background: #f4f6f9; color: #1a1a2e; }
@@ -317,6 +317,23 @@ function clearMatched() {
 }
 
 /* =========================================================
+   振动反馈
+   iOS Safari 不支持（会静默失败），安卓浏览器支持
+   ========================================================= */
+function vibrate(type) {
+  if (!navigator.vibrate) return;
+  try {
+    if (type === 'ok') {
+      navigator.vibrate(60);                // 短震
+    } else if (type === 'dup') {
+      navigator.vibrate([80, 60, 80]);      // 双震
+    } else if (type === 'miss') {
+      navigator.vibrate([300, 100, 300, 100, 300]); // 三长震（强提示）
+    }
+  } catch(e) {}
+}
+
+/* =========================================================
    音频
    ========================================================= */
 let audioCtx = null;
@@ -605,18 +622,21 @@ function check(code){
     const info = getRowInfo(hit);
     addLog(code, "成功", info);
     playBeep('ok');
+    vibrate('ok');
     speak("可以配送");
     toast("✅ 已核对 · 可以配送", info);
   } else if(dup){
     logMsg("dup", ts + " ⚠️ 重复扫描：" + code);
     addLog(code, "重复", "该条码已核对过");
     playBeep('dup');
+    vibrate('dup');
     speak("重复扫描");
     toast("⚠️ 重复扫描", "该条码已核对过：" + code);
   } else {
     logMsg("miss", ts + " ❌ 未在表格中找到：" + code);
     addLog(code, "失败", "未在表格中找到");
     playBeep('miss');
+    vibrate('miss');  // 强烈三长震，不看屏幕也能感觉到
     speak("不可配送，需滞留");
     toast("❌ 不可配送，需滞留", "未在表格中找到：" + code);
   }
@@ -909,20 +929,17 @@ $("btnExportLog").onclick = async () => {
 };
 
 /* =========================================================
-   清除保存的数据 —— 【关键修复】
-   改为非 async 函数，UI 立即响应，IndexedDB 删除放后台
+   清除保存的数据
    ========================================================= */
 $("btnClearStorage").onclick = function() {
   if (!confirm("确定要清除已保存的表格、核对进度和运行日志吗？此操作不可恢复。")) return;
 
-  // 1. 立即重置内存状态（同步）
   hasSavedData = false;
   headers = []; rows = []; matchColIdx = -1;
   matchedSet = new Set(); codeIndex = new Map();
   checkLog = [];
   lastHitRow = -1; fileBase = "核对结果";
 
-  // 2. 立即更新 UI（同步）
   $("restoreBanner").style.display = "none";
   $("fileName").textContent = "";
   $("colBadge").style.display = "none";
@@ -935,9 +952,8 @@ $("btnClearStorage").onclick = function() {
   $("log").innerHTML = "";
   $("btnCamera").style.display = "none";
   $("btnStop").style.display = "none";
-  $("btnUpload").disabled = false;  // 确保上传按钮可用
+  $("btnUpload").disabled = false;
 
-  // 3. 后台异步删除数据库，不阻塞用户操作（关键）
   try { deleteTableData(); } catch(e) {}
   try { deleteLogFromDB(); } catch(e) {}
   clearMatched();
