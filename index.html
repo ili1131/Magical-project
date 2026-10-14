@@ -229,15 +229,15 @@ td.matched{background:#ffe3e3 !important;color:#b02a37;font-weight:700}
 <button class="btn btn-primary" id="btnUpload" disabled>上传Excel</button>
 <button class="btn btn-dark need-data" id="btnExportLog" style="display:none">运行日志</button>
 <button class="btn btn-secondary need-data" id="btnChangeCol" style="display:none">切换核对模式</button>
-<button class="btn btn-warning need-data" id="btnLocate" style="display:none">📍 定位项目位置</button>
+<button class="btn btn-warning need-data" id="btnLocate" style="display:none">定位项目位置</button>
 <button class="btn btn-info need-data" id="btnExport" style="display:none">分享全部的数据</button>
 <button class="btn btn-info need-data" id="btnExportMatched" style="display:none">分享已扫描数据</button>
-<button class="btn btn-dark need-data span-2" id="btnVoice" style="display:none">🎤 语音识别条码</button>
+<button class="btn btn-dark need-data span-2" id="btnVoice" style="display:none">语音识别</button>
 <button class="btn btn-success need-data span-2" id="btnCamera" style="display:none">开始扫描</button>
 <button class="btn btn-danger span-2" id="btnStop" style="display:none">停止扫描</button>
 </div>
 <div style="margin-top:10px;min-height:18px">
-<span id="fileName"></span>
+<span id="fileName" style="display:none"></span>
 <span id="uploadBusy">⏳ 正在解析表格…</span>
 </div>
 </div>
@@ -275,7 +275,7 @@ td.matched{background:#ffe3e3 !important;color:#b02a37;font-weight:700}
 
 <div id="modalMask"><div id="modal"><h3 id="modalTitle">提示</h3><div class="mbody" id="modalBody"></div><div class="mfoot"><button class="btn btn-primary" id="modalOk">知道了</button></div></div></div>
 
-<div id="colPickerMask"><div id="colPicker"><h3>请选择核对模式</h3><div class="colPickerHint">「全部列」会对整张表格所有单元格进行核对；选择具体列则仅核对那一列</div><div id="colPickerList"></div></div></div>
+<div id="colPickerMask"><div id="colPicker"><h3>请选择核对模式</h3><div class="colPickerHint">「全部内容」会对整张表格所有单元格进行核对；选择具体列则仅核对那一列</div><div id="colPickerList"></div></div></div>
 
 <div id="voiceMask">
 <div id="voicePanel">
@@ -377,10 +377,10 @@ $("modalOk").onclick=()=>$("modalMask").classList.remove("show");
 $("modalMask").onclick=e=>{if(e.target===$("modalMask"))$("modalMask").classList.remove("show")};
 function hasGetUserMedia(){return!!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia)}
 function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}
-function modeText(idx){if(idx===-1)return"全部列（核对整表所有单元格）";if(idx===null||idx===undefined)return"";return headers[idx]||("第"+(idx+1)+"列")}
+function modeText(idx){if(idx===-1)return"全部内容";if(idx===null||idx===undefined)return"";return headers[idx]||("第"+(idx+1)+"列")}
 
 function pickColumn(currentIdx,callback){const mask=$("colPickerMask"),list=$("colPickerList");list.innerHTML="";
-const allBtn=document.createElement("button");allBtn.className="colPickBtn allBtn"+(currentIdx===-1?" current":"");allBtn.innerHTML='<span class="idx">ALL</span>全部列（核对整表所有单元格）';allBtn.onclick=()=>{mask.classList.remove("show");callback(-1)};list.appendChild(allBtn);
+const allBtn=document.createElement("button");allBtn.className="colPickBtn allBtn"+(currentIdx===-1?" current":"");allBtn.innerHTML='<span class="idx">ALL</span>全部内容';allBtn.onclick=()=>{mask.classList.remove("show");callback(-1)};list.appendChild(allBtn);
 headers.forEach((h,i)=>{const btn=document.createElement("button");btn.className="colPickBtn"+(i===currentIdx?" current":"");btn.innerHTML='<span class="idx">第'+(i+1)+'列</span>'+esc(h||"(空标题)");btn.onclick=()=>{mask.classList.remove("show");callback(i)};list.appendChild(btn)});
 mask.classList.add("show")}
 
