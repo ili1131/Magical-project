@@ -32,11 +32,16 @@
   .log .ok { color: #198754; }
   .log .dup { color: #fd7e14; }
   .log .miss { color: #dc3545; }
-  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  
+  /* ====== 这里改动了表格的样式，解决无法横向拖动的问题 ====== */
+  table { border-collapse: collapse; font-size: 13px; width: max-content; min-width: 100%; }
   th, td { border: 1px solid #e3e7ee; padding: 7px 8px; text-align: left; white-space: nowrap; }
-  th { background: #eef2f8; position: sticky; top: 0; }
+  th { background: #eef2f8; position: sticky; top: 0; z-index: 1; }
   tr.matched td { background: #ffe3e3 !important; color: #b02a37; font-weight: 700; }
-  .table-wrap { max-height: 50vh; overflow: auto; border-radius: 8px; }
+  /* 增加 -webkit-overflow-scrolling 让苹果手机滑动更丝滑 */
+  .table-wrap { max-height: 50vh; overflow: auto; border-radius: 8px; -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y; }
+  /* ====================================================== */
+
   .hint { color: #666; font-size: 13px; line-height: 1.6; }
   #fileName { font-size: 13px; color: #0b5ed7; margin-left: 6px; word-break: break-all; }
   .toast { position: fixed; left: 50%; bottom: 60px; transform: translateX(-50%); background: rgba(0,0,0,.8); color: #fff; padding: 10px 20px; border-radius: 24px; font-size: 14px; display: none; z-index: 99; max-width: 80vw; text-align: center; }
@@ -172,11 +177,10 @@ let matchColIdx = -1, matchedSet = new Set(), codeIndex = new Map();
 let fileBase = "核对结果";
 const $ = id => document.getElementById(id);
 
-/* ===== 音频处理（核心修复：解决苹果静音问题） ===== */
+/* ===== 音频处理 ===== */
 let audioCtx = null;
 function initAudio() {
   if (!audioCtx) {
-    // 兼容苹果的 AudioContext
     const AudioContext = window.AudioContext || window.webkitAudioContext;
     if (AudioContext) audioCtx = new AudioContext();
   }
@@ -191,12 +195,12 @@ function playBeep(type) {
     const gain = audioCtx.createGain();
     osc.connect(gain); gain.connect(audioCtx.destination);
     if (type === 'ok') {
-      osc.frequency.value = 1200; // 高频短促
+      osc.frequency.value = 1200;
       gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
       osc.start(); osc.stop(audioCtx.currentTime + 0.15);
     } else if (type === 'dup') {
-      osc.frequency.value = 800; // 中频双响
+      osc.frequency.value = 800;
       gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
       osc.start(); osc.stop(audioCtx.currentTime + 0.1);
@@ -209,7 +213,7 @@ function playBeep(type) {
         osc2.start(); osc2.stop(audioCtx.currentTime + 0.1);
       }, 150);
     } else if (type === 'miss') {
-      osc.frequency.value = 400; // 低频长鸣
+      osc.frequency.value = 400;
       gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
       osc.start(); osc.stop(audioCtx.currentTime + 0.4);
@@ -328,10 +332,8 @@ function check(code){
     matchedSet.add(hit);
     logMsg("ok", ts + " ✅ 匹配成功：" + code);
     renderTable(); updateStats();
-    playBeep('ok'); // 滴声
-    speak("可以送"); // 语音
-    const tr = document.querySelector("tr[data-i='"+hit+"']");
-    if(tr) tr.scrollIntoView({block:"center", behavior:"smooth"});
+    playBeep('ok');
+    speak("可以送");
     toast("✅ 已标红：" + code);
   } else if(dup){
     logMsg("dup", ts + " ⚠️ 重复扫描：" + code);
@@ -525,7 +527,6 @@ function cameraErrText(e){
 
 $("btnCamera").onclick = async () => {
   if(scanning || starting) return;
-  // 核心修复：在用户点击按钮时，立刻激活音频上下文！
   initAudio();
 
   if(!hasGetUserMedia()){
