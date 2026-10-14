@@ -203,7 +203,7 @@ let hasSavedData = false;
 const $ = id => document.getElementById(id);
 
 /* =========================================================
-   IndexedDB 工具
+   IndexedDB
    ========================================================= */
 const DB_NAME = 'philips_check_db';
 const DB_VERSION = 1;
@@ -362,7 +362,7 @@ function esc(s){
 }
 
 /* =========================================================
-   上传（同步打开文件框）
+   上传
    ========================================================= */
 $("btnUpload").onclick = () => {
   if (hasSavedData) {
@@ -736,10 +736,17 @@ $("btnCamera").onclick = async () => {
 $("btnStop").onclick = () => { stopScan(); };
 
 /* =========================================================
-   导出工具（通用）
-   buildAndShareExcel(行号数组, 文件名后缀)
+   导出工具（统一文件名格式）
    ========================================================= */
-async function buildAndShareExcel(rowIdxList, suffix) {
+function getTodayStr() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return y + "-" + m + "-" + day;
+}
+
+async function buildAndShareExcel(rowIdxList, outBaseName) {
   if (typeof ExcelJS === "undefined") {
     toast("导出组件未加载完成", "请稍后再试，或刷新页面");
     return;
@@ -767,14 +774,14 @@ async function buildAndShareExcel(rowIdxList, suffix) {
     headers.forEach((h, j) => { ws.getColumn(j + 1).width = Math.max(12, String(h).length * 2 + 6); });
 
     const buf = await wb.xlsx.writeBuffer();
-    const outName = fileBase + "_" + suffix + ".xlsx";
+    const outName = outBaseName + ".xlsx";
     $("exportName").textContent = "已生成：" + outName;
 
     const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
     const file = new File([blob], outName, { type: blob.type });
 
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      try { await navigator.share({ files: [file], title: "核对结果" }); return; }
+      try { await navigator.share({ files: [file], title: outBaseName }); return; }
       catch(e){ if(e.name === "AbortError") return; }
     }
 
@@ -789,22 +796,21 @@ async function buildAndShareExcel(rowIdxList, suffix) {
   }
 }
 
-/* 按钮③：导出全部（原表格 + 标红） */
+/* 按钮③：导出全部 → 文件名 = 当天年月日，如 2026-10-14.xlsx */
 $("btnExport").onclick = () => {
   if (!rows.length) return;
-  buildAndShareExcel(rows.map((_, i) => i), "已核对");
+  buildAndShareExcel(rows.map((_, i) => i), getTodayStr());
 };
 
-/* 按钮④：只导出已核对（标红）的行 */
+/* 按钮④：只导出已核对行 → 文件名 = 年月日已配送的明细，如 2026-10-14已配送的明细.xlsx */
 $("btnExportMatched").onclick = () => {
   if (!rows.length) return;
   if (matchedSet.size === 0) {
     toast("提示", "还没有已核对的行可导出");
     return;
   }
-  // 按原始行号排序，让导出顺序和表格一致
   const idxList = Array.from(matchedSet).sort((a, b) => a - b);
-  buildAndShareExcel(idxList, "已核对行");
+  buildAndShareExcel(idxList, getTodayStr() + "已配送的明细");
 };
 
 /* ===== 清除保存的数据 ===== */
@@ -828,7 +834,7 @@ $("btnClearStorage").onclick = async () => {
 };
 
 /* =========================================================
-   页面加载后异步恢复
+   页面加载后恢复
    ========================================================= */
 async function tryRestore() {
   try {
