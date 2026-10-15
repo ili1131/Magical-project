@@ -445,7 +445,7 @@ td.matched{background:#ffe3e3 !important;color:#b02a37;font-weight:700}
 
 <main>
 <div id="restoreBanner">
-<span id="restoreText">💾 已恢复上次核对进度</span>
+<span id="restoreText">💾 已恢复关闭前核对进度</span>
 <span class="spacer"></span>
 <button class="btn btn-sm btn-danger" id="btnClearStorage">清除保存的数据</button>
 </div>
@@ -460,11 +460,11 @@ td.matched{background:#ffe3e3 !important;color:#b02a37;font-weight:700}
 </button>
 <button class="btn btn-primary need-data" id="btnExportLog" style="display:none">运行日志</button>
 <button class="btn btn-primary need-data" id="btnChangeCol" style="display:none">切换核对模式</button>
-<button class="btn btn-primary need-data" id="btnLocate" style="display:none">定位项目位置</button>
-<button class="btn btn-primary need-data" id="btnExport" style="display:none">分享全部的数据</button>
-<button class="btn btn-primary need-data" id="btnExportMatched" style="display:none">分享已扫描数据</button>
+<button class="btn btn-primary need-data" id="btnLocate" style="display:none">定位核对位置</button>
+<button class="btn btn-primary need-data" id="btnExport" style="display:none">分享全部数据</button>
+<button class="btn btn-primary need-data" id="btnExportMatched" style="display:none">分享扫描数据</button>
 <button class="btn btn-primary need-data span-2" id="btnVoice" style="display:none">语音识别</button>
-<button class="btn btn-primary need-data span-2" id="btnCamera" style="display:none">开始扫描</button>
+<button class="btn btn-primary need-data span-2" id="btnCamera" style="display:none">相机识别</button>
 <button class="btn btn-danger span-2" id="btnStop" style="display:none">停止扫描</button>
 </div>
 <div style="margin-top:12px;min-height:18px">
@@ -714,9 +714,9 @@ function openVoicePanel(){
   }
   voiceRawText="";voiceDisplayText="";voiceNormalizedText="";voiceActive=false;voiceHolding=false;
   clearTimeout(voiceEndTimer);voiceEndTimer=null;
-  $("voiceRawText").textContent="（等待语音…）";
+  $("voiceRawText").textContent="（请按住按钮开始识别语言）";
   $("voiceNormalizedText").textContent="—";
-  $("voiceStatus").textContent="🎤 按住下方按钮说话，松开结束";
+  $("voiceStatus").textContent="🎤 按住开始识别，抬起结束";
   $("voiceConfirmBtn").disabled=true;
   $("voiceHoldBtn").classList.remove("holding");
   $("voiceMask").classList.add("show");
@@ -729,7 +729,7 @@ function startHoldVoice(){
   if(!SR){$("voiceStatus").textContent="❌ 当前浏览器不支持语音识别";return}
   voiceHolding=true;
   $("voiceHoldBtn").classList.add("holding");
-  $("voiceStatus").textContent="🎤 正在聆听… 松开结束";
+  $("voiceStatus").textContent="🎤 识别中，转换逻辑已生效";
   clearTimeout(voiceEndTimer);voiceEndTimer=null;
   voiceDisplayText="";
   voiceRawText="";
@@ -767,10 +767,10 @@ function startHoldVoice(){
       const norm=basicNormalize(finalText);
       voiceNormalizedText=norm;
       if(norm){
-        $("voiceStatus").textContent="✅ 识别完成，请点「查找匹配」";
+        $("voiceStatus").textContent="✅ 识别完成、请点下方「查找匹配」";
         $("voiceConfirmBtn").disabled=false;
       }else{
-        $("voiceStatus").textContent="⚠️ 没有识别到内容，请再按住试一次";
+        $("voiceStatus").textContent="⚠️ 没有识别到内容，请再试一次";
         $("voiceConfirmBtn").disabled=true;
       }
     };
