@@ -513,10 +513,10 @@ td.matched{background:#ffe3e3 !important;color:#b02a37;font-weight:700}
 <h3>🎤 语音识别条码</h3>
 <div class="voiceHint">
 📌 摄像头扫码：须完全匹配<br>
-📌 语音识别：可以只读部分内容进行搜索匹配
+📌 语音识别：可只读部分内容进行搜索匹配
 </div>
 <div id="voiceStatus">准备中…</div>
-<div class="voiceBlock"><span class="label">识别到的原文</span><div class="content" id="voiceRawText">（等待语音…）</div></div>
+<div class="voiceBlock"><span class="label">解析语音</span><div class="content" id="voiceRawText">（等待用户按住说话）</div></div>
 <div class="voiceBlock norm" style="display:none;"><span class="label" style="color:#1f8a3b">用于比对（中文数字已转阿拉伯）</span><div class="content" id="voiceNormalizedText">—</div></div>
 <div class="voiceActions">
 <button class="btn btn-secondary" id="voiceCancelBtn">取消</button>
@@ -531,7 +531,7 @@ td.matched{background:#ffe3e3 !important;color:#b02a37;font-weight:700}
 <h3>🔍 模糊匹配结果</h3>
 <div class="fuzzyHint">你读出的内容：<span id="fuzzyInput">—</span><br>以下是表格中<strong>最相似</strong>的单元格，请点击选择要核对的那一个：</div>
 <div id="fuzzyList"></div>
-<div id="fuzzyEmpty" style="display:none">❌ 没有找到相似的单元格<br>请点「重新识别」再读一次，或点「取消」</div>
+<div id="fuzzyEmpty" style="display:none">❌ 没有找到相似的单元格<br>请点「重新识别」或「取消」</div>
 <div class="fuzzyActions">
 <button class="btn btn-secondary" id="fuzzyCancelBtn">取消</button>
 <button class="btn btn-warning" id="fuzzyRetryBtn">重新识别</button>
@@ -661,7 +661,7 @@ if(positions){for(const p of positions){if(!matchedCells.has(p.r+"-"+p.c)){hit=p
 const ts=new Date().toLocaleTimeString();
 if(hit){markMatched(hit.r,hit.c,code,"")}
 else if(dup){logMsg("dup",ts+" ⚠️ 重复扫描："+code);addLog(code,"重复","该条码已核对过");playBeep('dup');vibrate('dup');speak("重复扫描");toast("⚠️ 重复扫描","该条码已核对过："+code)}
-else{logMsg("miss",ts+" ❌ 未在表格中找到："+code);addLog(code,"失败","未在表格中找到");playBeep('miss');vibrate('miss');speak("不可配送，需滞留");toast("❌ 不可配送，需滞留","未在表格中找到："+code)}}
+else{logMsg("miss",ts+" ❌ 未在表格中找到："+code);addLog(code,"失败","未在表格中找到");playBeep('miss');vibrate('miss');speak("不可配送，需滞留");toast("❌ 不可配送！需滞留","未在表格中找到："+code)}}
 
 function basicNormalize(s){if(!s)return"";let r=String(s);
 r=r.replace(/[\uFF01-\uFF5E]/g,ch=>String.fromCharCode(ch.charCodeAt(0)-0xFEE0));
