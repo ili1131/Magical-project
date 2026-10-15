@@ -434,7 +434,7 @@ td.matched{background:#ffe3e3 !important;color:#b02a37;font-weight:700}
 <body>
 <div id="loadStatus">
 <div class="spinner"></div>
-<div id="loadText">加载必要组件中～预计耗时5S-请稍候…</div>
+<div id="loadText">加载必要组件中～预计耗时5秒</div>
 <button class="btn btn-primary" id="loadRetry" onclick="location.reload()">加载失败，点击重试</button>
 </div>
 
@@ -529,7 +529,7 @@ td.matched{background:#ffe3e3 !important;color:#b02a37;font-weight:700}
 <div id="fuzzyMask">
 <div id="fuzzyPanel">
 <h3>🔍 模糊匹配结果</h3>
-<div class="fuzzyHint">你读出的内容：<span id="fuzzyInput">—</span><br>以下是表格中<strong>最相似</strong>的单元格，请点击选择要核对的那一个：</div>
+<div class="fuzzyHint">你读出的内容：<span id="fuzzyInput">—</span><br>已匹配<strong>相似</strong>的内容，请点击选择核对哪一项：</div>
 <div id="fuzzyList"></div>
 <div id="fuzzyEmpty" style="display:none">❌ 没有找到相似的单元格<br>请点「重新识别」或「取消」</div>
 <div class="fuzzyActions">
@@ -714,7 +714,7 @@ function openVoicePanel(){
   }
   voiceRawText="";voiceDisplayText="";voiceNormalizedText="";voiceActive=false;voiceHolding=false;
   clearTimeout(voiceEndTimer);voiceEndTimer=null;
-  $("voiceRawText").textContent="（请按住按钮开始识别语言）";
+  $("voiceRawText").textContent="（请按住按钮开始识别）";
   $("voiceNormalizedText").textContent="—";
   $("voiceStatus").textContent="🎤 按住开始识别，抬起结束";
   $("voiceConfirmBtn").disabled=true;
