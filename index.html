@@ -434,7 +434,7 @@ td.matched{background:#ffe3e3 !important;color:#b02a37;font-weight:700}
 <body>
 <div id="loadStatus">
 <div class="spinner"></div>
-<div id="loadText">正在加载组件，请稍候…</div>
+<div id="loadText">加载必要组件中～预计耗时5S-请稍候…</div>
 <button class="btn btn-primary" id="loadRetry" onclick="location.reload()">加载失败，点击重试</button>
 </div>
 
@@ -506,14 +506,14 @@ td.matched{background:#ffe3e3 !important;color:#b02a37;font-weight:700}
 
 <div id="modalMask"><div id="modal"><h3 id="modalTitle">提示</h3><div class="mbody" id="modalBody"></div><div class="mfoot"><button class="btn btn-primary" id="modalOk">知道了</button></div></div></div>
 
-<div id="colPickerMask"><div id="colPicker"><h3>请选择核对模式</h3><div id="colPickerList"></div></div></div>
+<div id="colPickerMask"><div id="colPicker"><h3>选择核对模式</h3><div id="colPickerList"></div></div></div>
 
 <div id="voiceMask">
 <div id="voicePanel">
 <h3>🎤 语音识别条码</h3>
 <div class="voiceHint">
-📌 摄像头扫码：完全匹配（一字不差）<br>
-📌 语音识别：可以只读数字进行搜索匹配
+📌 摄像头扫码：须完全匹配<br>
+📌 语音识别：可以只读数字进行匹配条目
 </div>
 <div id="voiceStatus">准备中…</div>
 <div class="voiceBlock"><span class="label">识别到的原文</span><div class="content" id="voiceRawText">（等待语音…）</div></div>
@@ -622,7 +622,7 @@ pickColumn(null,function(idx){matchColIdx=idx;$("colBadge").style.display="inlin
 matchedSet=new Set();matchedCells=new Set();lastHitRow=-1;clearMatched();buildIndex();renderTable();updateStats();
 $("restoreBanner").style.display="none";showDataButtons(true);$("statCard").style.display="block";$("tableCard").style.display="block";$("btnCamera").style.display="";$("btnStop").style.display="none";
 toast("已读取 "+rows.length+" 行数据","正在后台保存进度…");
-saveTableData({headers:headers,rows:rows,matchColIdx:matchColIdx,sheetName:sheetName,fileBase:fileBase,savedAt:Date.now()}).then(ok=>{hasSavedData=ok;if(ok)toast("核对模式："+modeText(idx),"✅ 进度已保存，可放心关闭");else toast("核对模式："+modeText(idx),"⚠️ 进度保存失败，请勿关闭页面")})})}
+saveTableData({headers:headers,rows:rows,matchColIdx:matchColIdx,sheetName:sheetName,fileBase:fileBase,savedAt:Date.now()}).then(ok=>{hasSavedData=ok;if(ok)toast("核对模式："+modeText(idx),"✅ 进度已实时保存");else toast("核对模式："+modeText(idx),"⚠️ 进度保存失败，请勿关闭页面")})})}
 catch(err){console.error(err);toast("读取失败",String(err&&err.message||err));$("uploadBusy").style.display="none";$("btnUpload").disabled=false}};inp.click()}
 
 $("btnChangeCol").onclick=()=>{if(!headers.length)return;pickColumn(matchColIdx,function(idx){matchColIdx=idx;$("colBadge").style.display="inline";$("colBadge").textContent="核对模式："+modeText(idx);buildIndex();renderTable();updateStats();
