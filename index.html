@@ -1,83 +1,107 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>通知</title>
-    <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; text-align: center; padding: 50px 20px; background-color: #f7f7f7; }
-        .card { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 400px; margin: 0 auto; }
-        .wechat-id { font-size: 20px; font-weight: bold; color: #07C160; margin-bottom: 20px; }
-        .copy-btn { background-color: #07C160; color: white; border: none; padding: 12px 24px; font-size: 16px; border-radius: 5px; cursor: pointer; width: 100%; margin-bottom: 10px; }
-        .copy-btn:active { transform: scale(0.98); }
-        .guide-text { font-size: 14px; color: #666; margin-top: 10px; }
-    </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#102b24">
+<title>九寨沟 · 全景漫游</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css">
+<style>
+:root{--bg:#0b1714;--panel:#10251f;--mint:#a9e7c8;--muted:#b7cbc1;--line:#ffffff22}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:#f4faf6;font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px clamp(14px,3vw,34px);background:#0b1714;border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:12px}.logo{display:grid;place-items:center;width:42px;height:42px;border-radius:14px;background:linear-gradient(135deg,#c8f5dc,#438b70);color:#12352a;font-size:23px}
+h1{font-size:clamp(17px,2vw,23px);margin:0}.sub{font-size:12px;color:var(--muted);margin-top:4px}
+button{font:inherit;cursor:pointer}.action{border:1px solid var(--line);border-radius:12px;background:#ffffff0d;color:white;padding:10px 13px}
+main{max-width:1500px;margin:auto;padding:16px clamp(10px,2vw,24px) 30px}
+.viewer-wrap{position:relative;border:1px solid var(--line);border-radius:18px;overflow:hidden;background:#142720}
+#panorama{height:min(68vh,740px);min-height:350px;width:100%;background:#172b24}
+#photoMode{display:none;height:min(68vh,740px);min-height:350px;overflow:hidden;position:relative;touch-action:none;background:#13251f}
+#photoMode img{height:100%;width:100%;object-fit:contain;user-select:none;-webkit-user-drag:none;transform-origin:center;pointer-events:none}
+.overlay-title{position:absolute;top:18px;left:20px;z-index:4;pointer-events:none;text-shadow:0 2px 12px #000}
+.overlay-title .eyebrow{font-size:11px;letter-spacing:.18em;color:var(--mint)}.overlay-title h2{font-size:clamp(26px,4vw,44px);margin:6px 0}.overlay-title p{margin:0;color:#e1eee7;font-size:13px}
+.notice{position:absolute;left:18px;bottom:16px;z-index:4;padding:8px 11px;background:#07110ecc;border:1px solid var(--line);border-radius:10px;font-size:11px;color:#e1eee7;max-width:min(90%,550px)}
+.tools{position:absolute;right:15px;bottom:15px;z-index:5;display:flex;gap:7px;flex-direction:column}.tools button{width:42px;height:42px;border:1px solid #ffffff44;border-radius:12px;background:#06130fc9;color:white;font-size:21px}
+.section-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:22px 2px 12px}.section-head h3{margin:0;font-size:17px}.section-head span{font-size:12px;color:var(--muted)}
+.cards{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+.card{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:#ffffff08;text-align:left;color:white;padding:0;min-width:0}
+.card.active{border-color:var(--mint);box-shadow:0 0 0 1px #a9e7c855;background:#a9e7c810}
+.card img{display:block;width:100%;height:100px;object-fit:cover;background:#213c31}.card strong{display:block;padding:10px 10px 3px;font-size:13px}.card small{display:block;padding:0 10px 11px;color:var(--muted);font-size:11px}
+.credits{margin-top:18px;color:#9eb4a9;font-size:11px;line-height:1.7}.credits a{color:#c4f2d9}
+@media(max-width:700px){header{padding:12px}.logo{width:36px;height:36px}.sub{display:none}.action{padding:9px;font-size:12px}#panorama,#photoMode{height:58vh;min-height:320px}.cards{grid-template-columns:repeat(5,130px);overflow-x:auto;padding-bottom:5px}.card img{height:72px}.section-head{align-items:flex-start;flex-direction:column;gap:4px}.overlay-title{top:14px;left:14px}.notice{left:10px;bottom:10px;font-size:10px}.tools{right:9px;bottom:9px}}
+</style>
 </head>
 <body>
-    <div class="card">
-        <p>已搬迁到微信小程序</p>
-        <div class="wechat-id">微信号：ili1131</div>
-        <button class="copy-btn" id="copy-btn">一键复制并打开微信</button>
-        <p class="guide-text" id="guide-text" style="display:none;">微信号已复制，请打开微信粘贴搜索添加</p>
-    </div>
-
-    <script>
-        document.getElementById('copy-btn').addEventListener('click', function() {
-            const wechatId = 'ili1131';
-            const btn = this;
-            const guideText = document.getElementById('guide-text');
-
-            // 1. 复制微信号
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(wechatId).then(() => {
-                    showSuccess(btn, guideText);
-                }).catch(() => {
-                    fallbackCopy(wechatId, btn, guideText);
-                });
-            } else {
-                fallbackCopy(wechatId, btn, guideText);
-            }
-        });
-
-        function showSuccess(btn, guideText) {
-            const originalText = btn.innerText;
-            btn.innerText = '✅ 复制成功！';
-            btn.style.backgroundColor = '#2ecc71';
-            guideText.style.display = 'block'; // 显示引导文字
-
-            // 2. 尝试唤起微信 (仅限外部浏览器)
-            const ua = navigator.userAgent.toLowerCase();
-            const isWeChat = /micromessenger/i.test(ua);
-            if (!isWeChat) {
-                // 非微信环境，尝试唤醒
-                window.location.href = 'weixin://';
-            }
-
-            setTimeout(() => {
-                btn.innerText = originalText;
-                btn.style.backgroundColor = '#07C160';
-            }, 2000);
-        }
-
-        function fallbackCopy(text, btn, guideText) {
-            const textArea = document.createElement("textarea");
-            textArea.value = text;
-            textArea.style.position = "fixed";
-            document.body.appendChild(textArea);
-            textArea.focus();
-            textArea.select();
-            try {
-                const successful = document.execCommand('copy');
-                if (successful) {
-                    showSuccess(btn, guideText);
-                } else {
-                    alert('复制失败，请长按上方微信号手动复制');
-                }
-            } catch (err) {
-                alert('复制失败，请长按上方微信号手动复制');
-            }
-            document.body.removeChild(textArea);
-        }
-    </script>
+<header>
+ <div class="brand"><div class="logo">◉</div><div><h1>九寨沟 · 全景漫游</h1><div class="sub">拖动环视 · 缩放 · 切换景点</div></div></div>
+ <button class="action" id="fullscreen">⛶ 全屏</button>
+</header>
+<main>
+ <section class="viewer-wrap">
+  <div id="panorama" aria-label="五花海全景查看器"></div>
+  <div id="photoMode"><img id="photo" alt="九寨沟景点照片"></div>
+  <div class="overlay-title"><div class="eyebrow">SICHUAN · CHINA</div><h2 id="sceneName">五花海</h2><p id="sceneDesc">湖水色彩斑斓 · 横向全景视图</p></div>
+  <div class="notice" id="notice">五花海：可拖动环视。此素材为横向全景照片，并非完整球形 VR 全景。</div>
+  <div class="tools"><button id="zoomIn" aria-label="放大">＋</button><button id="zoomOut" aria-label="缩小">−</button><button id="reset" aria-label="重置视角">↺</button></div>
+ </section>
+ <div class="section-head"><h3>切换景点</h3><span>五花海支持横向全景；其他景点为普通照片浏览，避免把照片误称为 360° 全景。</span></div>
+ <div class="cards" id="cards"></div>
+ <div class="credits">
+  素材说明：五花海横向全景照片由 George Lu 拍摄，来自 Wikimedia Commons，采用 <a href="https://creativecommons.org/licenses/by/2.0/" target="_blank" rel="noreferrer">CC BY 2.0</a> 许可；本页面展示时做了网页适配，未暗示作者认可本项目。
+  <br>照片来源：<a href="https://commons.wikimedia.org/wiki/File:九寨沟五花海全景_Jiuzhaigou_Five_Flower_Lake_Panorama.jpg" target="_blank" rel="noreferrer">Wikimedia Commons 文件页</a>。其他景点图片也链接到各自的 Wikimedia Commons 文件页。
+ </div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"></script>
+<script>
+const panoUrl = "https://upload.wikimedia.org/wikipedia/commons/0/02/%E4%B9%9D%E5%AF%A8%E6%B2%9F%E4%BA%94%E8%8A%B1%E6%B5%B7%E5%85%A8%E6%99%AF_Jiuzhaigou_Five_Flower_Lake_Panorama.jpg";
+const scenes = [
+ {name:"五花海",desc:"湖水色彩斑斓 · 横向全景视图",kind:"pano",img:panoUrl,thumb:panoUrl,notice:"五花海：可拖动环视。此素材为横向全景照片，并非完整球形 VR 全景。",credit:"George Lu · CC BY 2.0",page:"https://commons.wikimedia.org/wiki/File:九寨沟五花海全景_Jiuzhaigou_Five_Flower_Lake_Panorama.jpg"},
+ {name:"长海",desc:"高山湖泊 · 普通照片浏览",kind:"photo",img:"https://commons.wikimedia.org/wiki/Special:FilePath/Long_Lake_Jiuzhaigou.jpg",thumb:"https://upload.wikimedia.org/wikipedia/commons/thumb/0/0f/Long_Lake_Jiuzhaigou.jpg/640px-Long_Lake_Jiuzhaigou.jpg",notice:"长海：当前使用普通风景照片，可缩放查看，不是 360° 全景。",credit:"Jean-Marie Hullot",page:"https://commons.wikimedia.org/wiki/File:Long_Lake_Jiuzhaigou.jpg"},
+ {name:"五彩池",desc:"蓝绿色湖水 · 普通照片浏览",kind:"photo",img:"https://commons.wikimedia.org/wiki/Special:FilePath/九寨溝五彩池_Jiuzhaigou_Wucaichi_Lake_-_panoramio.jpg",thumb:"https://commons.wikimedia.org/wiki/Special:FilePath/九寨溝五彩池_Jiuzhaigou_Wucaichi_Lake_-_panoramio.jpg",notice:"五彩池：当前使用普通风景照片，可缩放查看，不是 360° 全景。",credit:"lienyuan lee · CC BY 3.0",page:"https://commons.wikimedia.org/wiki/File:九寨溝五彩池_Jiuzhaigou_Wucaichi_Lake_-_panoramio.jpg"},
+ {name:"珍珠滩瀑布",desc:"瀑布与钙华滩 · 普通照片浏览",kind:"photo",img:"https://commons.wikimedia.org/wiki/Special:FilePath/九寨溝珍珠灘瀑布_Jiuzhaigou_Pearl_Shoal_Falls_-_panoramio.jpg",thumb:"https://commons.wikimedia.org/wiki/Special:FilePath/九寨溝珍珠灘瀑布_Jiuzhaigou_Pearl_Shoal_Falls_-_panoramio.jpg",notice:"珍珠滩瀑布：当前使用普通风景照片，可缩放查看，不是 360° 全景。",credit:"lienyuan lee · CC BY 3.0",page:"https://commons.wikimedia.org/wiki/File:九寨溝珍珠灘瀑布_Jiuzhaigou_Pearl_Shoal_Falls_-_panoramio.jpg"},
+ {name:"诺日朗瀑布",desc:"山谷瀑布 · 普通照片浏览",kind:"photo",img:"https://commons.wikimedia.org/wiki/Special:FilePath/Jiuzhaigou_Waterfall.jpg",thumb:"https://commons.wikimedia.org/wiki/Special:FilePath/Jiuzhaigou_Waterfall.jpg",notice:"诺日朗瀑布：当前使用普通风景照片，可缩放查看，不是 360° 全景。",credit:"Gjl · GFDL",page:"https://commons.wikimedia.org/wiki/File:Jiuzhaigou_Waterfall.jpg"}
+];
+let active=0, viewer=null, zoom=1, photoX=0, photoY=0, dragging=false, sx=0, sy=0, startX=0, startY=0;
+const panoEl=document.getElementById("panorama"), photoMode=document.getElementById("photoMode"), photo=document.getElementById("photo");
+const sceneName=document.getElementById("sceneName"), sceneDesc=document.getElementById("sceneDesc"), notice=document.getElementById("notice");
+const cards=document.getElementById("cards");
+function initPano(){
+ if(!window.pannellum){panoEl.innerHTML='<div style="padding:30px;color:white">全景组件加载失败，请检查网络连接后刷新。</div>';return;}
+ viewer=pannellum.viewer("panorama",{type:"equirectangular",panorama:panoUrl,autoLoad:true,showZoomCtrl:false,showFullscreenCtrl:false,mouseZoom:true,draggable:true,haov:360,vaov:67.4,vOffset:0,hfov:95,compass:false,autoRotate:0});
+}
+function updatePhoto(){photo.style.transform=`translate(${photoX}px,${photoY}px) scale(${zoom})`;}
+function showScene(i){
+ active=i;const s=scenes[i];sceneName.textContent=s.name;sceneDesc.textContent=s.desc;notice.textContent=s.notice;
+ [...cards.children].forEach((el,j)=>el.classList.toggle("active",j===i));
+ if(s.kind==="pano"){
+  photoMode.style.display="none";panoEl.style.display="block";
+  if(viewer){viewer.destroy();viewer=null;}initPano();
+ }else{
+  if(viewer){viewer.destroy();viewer=null;}panoEl.style.display="none";photoMode.style.display="block";
+  photo.src=s.img;photo.alt=s.name;zoom=1;photoX=0;photoY=0;updatePhoto();
+  photo.onerror=()=>{notice.textContent=s.name+"：图片加载失败，请点击景点名称来源页查看。";};
+ }
+}
+scenes.forEach((s,i)=>{
+ const b=document.createElement("button");b.className="card"+(i===0?" active":"");b.type="button";
+ const im=document.createElement("img");im.src=s.thumb;im.alt="";im.loading="lazy";
+ const strong=document.createElement("strong");strong.textContent=s.name;
+ const small=document.createElement("small");small.textContent=i===0?"横向全景":"普通照片";
+ b.append(im,strong,small);b.addEventListener("click",()=>showScene(i));cards.append(b);
+});
+function changeZoom(delta){
+ if(scenes[active].kind==="pano" && viewer){viewer.setHfov(Math.max(35,Math.min(120,viewer.getHfov()+delta)));return;}
+ zoom=Math.max(1,Math.min(4,zoom+delta*.035));updatePhoto();
+}
+document.getElementById("zoomIn").onclick=()=>changeZoom(-7);
+document.getElementById("zoomOut").onclick=()=>changeZoom(7);
+document.getElementById("reset").onclick=()=>{if(scenes[active].kind==="pano"&&viewer){viewer.setHfov(95);viewer.setPitch(0);viewer.setYaw(0);}else{zoom=1;photoX=photoY=0;updatePhoto();}};
+document.getElementById("fullscreen").onclick=async()=>{try{if(!document.fullscreenElement)await document.querySelector(".viewer-wrap").requestFullscreen();else await document.exitFullscreen();}catch(e){alert("此浏览器暂不支持全屏。");}};
+photoMode.addEventListener("pointerdown",e=>{dragging=true;sx=e.clientX;sy=e.clientY;startX=photoX;startY=photoY;photoMode.setPointerCapture(e.pointerId);});
+photoMode.addEventListener("pointermove",e=>{if(!dragging)return;photoX=startX+e.clientX-sx;photoY=startY+e.clientY-sy;updatePhoto();});
+photoMode.addEventListener("pointerup",()=>dragging=false);photoMode.addEventListener("pointercancel",()=>dragging=false);
+photoMode.addEventListener("wheel",e=>{e.preventDefault();zoom=Math.max(1,Math.min(4,zoom+(e.deltaY<0?.12:-.12)));updatePhoto();},{passive:false});
+initPano();
+</script>
 </body>
 </html>
