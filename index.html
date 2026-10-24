@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="zh-TW">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TXT 轉 EPUB</title>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 760px; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; }
+    input, select, button { width: 100%; box-sizing: border-box; margin: .35rem 0 .9rem; padding: .6rem; }
+    button { cursor: pointer; }
+    code { background: #f3f3f3; padding: .1rem .3rem; }
+    .ok { color: #137333; }
+    .err { color: #b3261e; }
+  </style>
+</head>
+<body>
+  <h1>TXT 轉 EPUB</h1>
+  <p>純前端轉換；檔案不會上傳。輸出 EPUB 內容一律 UTF-8。</p>
+
+  <label>選擇 TXT</label>
+  <input id="file" type="file" accept=".txt,.text,text/plain" />
+
+  <label>輸入編碼</label>
+  <select id="encoding">
+    <option value="auto">自動偵測（UTF-8 / GB18030 / Big5 等）</option>
+    <option value="utf-8">UTF-8</option>
+    <option value="utf-8">UTF-8 with BOM</option>
+    <option value="gb18030">GB18030 / GBK / GB2312</option>
+    <option value="big5">Big5</option>
+  </select>
+
+  <label>書名</label>
+  <input id="title" placeholder="留空就用 TXT 檔名" />
+
+  <label>作者</label>
+  <input id="author" value="Unknown" />
+
+  <label>語言</label>
+  <input id="lang" value="zh-TW" />
+
+  <button id="go">轉成 EPUB</button>
+  <p id="msg"></p>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const chapterRe = /^\s*(第[0-9零一二三四五六七八九十百千万两]+[章节回卷部集]\s*[^\n\r]*|Chapter\s+\d+[^\n\r]*)\s*$/gim;
+
+function decodeAuto(buf, enc) {
+  const labels = enc === 'auto'
+    ? ['utf-8','gb18030','big5','shift_jis','euc-kr']
+    : [enc];
+  let last;
+  for (const label of labels) {
+    try { return { text: new TextDecoder(label, { fatal: true }).decode(buf), used: label }; }
+    catch (e) { last = e; }
+  }
+  throw new Error('解碼失敗：請手動選擇 GB18030/Big5/UTF-8。' + last);
+}
+
+function normalize(t) {
+  t = t.replace(/\r\n?/g, '\n').replace(/^\uFEFF/, '');
+  t = t.split('\n').map(l => l.replace(/[ \t]+$/,'')).join('\n');
+  return t.replace(/\n{3,}/g, '\n\n').trim();
+}
+
+function paras(block) {
+  return block.split(/\n\s*\n/).map(s => s.trim()).filter(Boolean);
+}
+
+function splitChapters(text) {
+  const ms = [...text.matchAll(chapterRe)];
+  if (!ms.length) return [['正文', text]];
+  const out = [];
+  const prefix = text.slice(0, ms[0].index).trim();
+  if (prefix) out.push(['前言', prefix]);
+  for (let i = 0; i < ms.length; i++) {
+    const start = ms[i].index + ms[i][0].length;
+    const end = i + 1 < ms.length ? ms[i + 1].index : text.length;
+    out.push([ms[i][0].trim(), text.slice(start, end).trim()]);
+  }
+  return out;
+}
+
+function xhtml(title, body, lang) {
+  const ps = paras(body).map(p => `    <p>${esc(p).replace(/\n/g,'<br/>')}</p>`).join('\n') || '    <p></p>';
+  return `<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="${esc(lang)}" lang="${esc(lang)}">
+<head><meta charset="utf-8"/><title>${esc(title)}</title><link rel="stylesheet" type="text/css" href="style.css"/></head>
+<body><h1>${esc(title)}</h1>
+${ps}
+</body></html>`;
+}
+
+function container() {
+  return `<?xml version="1.0" encoding="utf-8"?>
+<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>`;
+}
+
+function opf(uid, title, author, lang, files, titles) {
+  const manifest = files.map((f,i)=>`    <item id="chap${i+1}" href="${f}" media-type="application/xhtml+xml"/>`).join('\n');
+  const spine = files.map((_,i)=>`    <itemref idref="chap${i+1}"/>`).join('\n');
+  return `<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" unique-identifier="uid" version="2.0">
+<metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+<dc:identifier id="uid">${esc(uid)}</dc:identifier><dc:title>${esc(title)}</dc:title><dc:creator>${esc(author)}</dc:creator><dc:language>${esc(lang)}</dc:language>
+</metadata>
+<manifest>
+    <item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>
+    <item id="css" href="style.css" media-type="text/css"/>
+${manifest}
+</manifest>
+<spine toc="ncx">
+${spine}
+</spine>
+</package>`;
+}
+
+function ncx(uid, title, author, files, titles) {
+  const nav = files.map((f,i)=>`  <navPoint id="nav${i+1}" playOrder="${i+1}"><navLabel><text>${esc(titles[i])}</text></navLabel><content src="${f}"/></navPoint>`).join('\n');
+  return `<?xml version="1.0" encoding="utf-8"?>
+<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1"><head><meta name="dtb:uid" content="${esc(uid)}"/><meta name="dtb:depth" content="1"/></head><docTitle><text>${esc(title)}</text></docTitle><docAuthor><text>${esc(author)}</text></docAuthor><navMap>
+${nav}
+</navMap></ncx>`;
+}
+
+$('go').onclick = async () => {
+  const msg = $('msg');
+  msg.className = '';
+  try {
+    const f = $('file').files[0];
+    if (!f) throw new Error('請先選擇 TXT 檔。');
+
+    const { text, used } = decodeAuto(await f.arrayBuffer(), $('encoding').value);
+    const book = normalize(text);
+    if (!book) throw new Error('檔案內容是空的。');
+
+    const title = $('title').value.trim() || f.name.replace(/\.[^.]+$/, '');
+    const author = $('author').value.trim() || 'Unknown';
+    const lang = $('lang').value.trim() || 'zh-TW';
+    const chapters = splitChapters(book);
+    const files = chapters.map((_, i) => `chapter-${String(i+1).padStart(3,'0')}.xhtml`);
+    const titles = chapters.map(c => c[0]);
+    const uid = 'urn:uuid:txt2epub-' + crypto.randomUUID();
+
+    const zip = new JSZip();
+    zip.file('mimetype', 'application/epub+zip', { compression: 'STORE' }); // 必須第一個且不解壓縮
+    zip.file('META-INF/container.xml', container());
+    zip.file('OEBPS/content.opf', opf(uid, title, author, lang, files, titles));
+    zip.file('OEBPS/toc.ncx', ncx(uid, title, author, files, titles));
+    zip.file('OEBPS/style.css', 'body{font-family:serif;line-height:1.65;margin:1em}h1{font-size:1.35em}p{text-indent:2em;margin:.55em 0}');
+    chapters.forEach((c, i) => zip.file('OEBPS/' + files[i], xhtml(c[0], c[1], lang)));
+
+    const blob = await zip.generateAsync({ type: 'blob' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = title + '.epub';
+    a.click();
+    URL.revokeObjectURL(a.href);
+
+    msg.className = 'ok';
+    msg.textContent = `完成：${chapters.length} 章；輸入編碼 ${used}`;
+  } catch (e) {
+    msg.className = 'err';
+    msg.textContent = e.message || String(e);
+  }
+};
+</script>
+</body>
+</html>
