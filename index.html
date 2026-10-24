@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TXT 转 EPUB（单文件）</title>
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; background:#f5f5f7; color:#1d1d1f; }
+  .app { max-width:640px; margin:0 auto; padding:32px 20px 64px; }
+  h1 { font-size:24px; margin:0 0 6px; }
+  .sub { margin:0 0 24px; color:#6e6e73; font-size:14px; }
+  .drop { border:2px dashed #c7c7cc; border-radius:14px; padding:28px 16px; text-align:center; cursor:pointer; background:#fff; transition:.15s; }
+  .drop.over { border-color:#0071e3; background:#eef6ff; }
+  .drop p { margin:6px 0; color:#6e6e73; font-size:14px; }
+  .filename { color:#0071e3 !important; font-weight:600; word-break:break-all; }
+  .row { display:flex; gap:12px; margin-top:16px; flex-wrap:wrap; }
+  label { flex:1; min-width:200px; font-size:13px; color:#3a3a3c; display:flex; flex-direction:column; gap:6px; }
+  input, select { font:inherit; padding:10px 12px; border:1px solid #d2d2d7; border-radius:10px; background:#fff; color:inherit; }
+  button { margin-top:20px; width:100%; padding:14px; font:inherit; font-weight:600; border:none; border-radius:12px; background:#0071e3; color:#fff; cursor:pointer; }
+  button:disabled { background:#b8b8bd; cursor:not-allowed; }
+  #status { margin-top:16px; font-size:14px; color:#6e6e73; min-height:20px; word-break:break-all; }
+  #download { display:block; margin-top:16px; text-align:center; padding:14px; border-radius:12px; background:#34c759; color:#fff; font-weight:600; text-decoration:none; }
+  @media (prefers-color-scheme: dark) {
+    body { background:#000; color:#f5f5f7; }
+    .drop, input, select { background:#1c1c1e; border-color:#3a3a3c; }
+    .drop { border-color:#48484a; }
+    .drop.over { border-color:#0a84ff; background:#0b2a4a; }
+    .sub, .drop p, #status, label { color:#a1a1a6; }
+    input, select { color:#f5f5f7; }
+    button:disabled { background:#3a3a3c; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>TXT → EPUB</h1>
+  <p class="sub">全部在浏览器本地完成，文件不会上传到任何服务器。输出为单个 .epub 文件，可直接导入苹果图书。</p>
+
+  <div class="drop" id="drop">
+    <p>点击选择 TXT 文件，或拖拽到这里</p>
+    <p class="filename" id="fileName"></p>
+    <input type="file" id="file" accept=".txt,text/plain" hidden>
+  </div>
+
+  <div class="row">
+    <label>书名<input id="title" placeholder="默认使用文件名"></label>
+    <label>作者<input id="author" placeholder="可选"></label>
+  </div>
+
+  <div class="row">
+    <label>分段方式
+      <select id="paraMode">
+        <option value="line" selected>每个非空行一段（适合中文小说）</option>
+        <option value="blank">空行分段（适合英文 / 散文）</option>
+      </select>
+    </label>
+  </div>
+
+  <button id="go" disabled>开始转换</button>
+  <div id="status"></div>
+  <a id="download" style="display:none">下载 EPUB</a>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  const $ = (id) => document.getElementById(id);
+  const MAX_CHARS = 12000; // 每章大约多少字符（仅影响内部切章，不改变"单个 epub 文件"）
+
+  let currentFile = null;
+
+  /* ---------------- 文件选择 ---------------- */
+  const drop = $("drop"), fileInput = $("file");
+
+  drop.addEventListener("click", () => fileInput.click());
+  drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("over"); });
+  drop.addEventListener("dragleave", () => drop.classList.remove("over"));
+  drop.addEventListener("drop", (e) => {
+    e.preventDefault();
+    drop.classList.remove("over");
+    if (e.dataTransfer.files.length) setFile(e.dataTransfer.files[0]);
+  });
+  fileInput.addEventListener("change", () => {
+    if (fileInput.files.length) setFile(fileInput.files[0]);
+  });
+
+  function setFile(f) {
+    if (!/\.txt$/i.test(f.name) && f.type !== "text/plain") {
+      alert("请选择 .txt 文件");
+      return;
+    }
+    currentFile = f;
+    $("fileName").textContent = f.name + " · " + (f.size / 1024 / 1024).toFixed(2) + " MB";
+    if (!$("title").value.trim()) $("title").value = f.name.replace(/\.txt$/i, "");
+    $("go").disabled = false;
+  }
+
+  /* ---------------- 工具函数 ---------------- */
+  function setStatus(msg) { $("status").textContent = msg; }
+
+  function esc(s) {
+    return String(s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  function makeUuid() {
+    if (typeof crypto !== "undefined" && crypto.randomUUID) {
+      return "urn:uuid:" + crypto.randomUUID();
+    }
+    return "urn:uuid:" + "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+      const r = (Math.random() * 16) | 0;
+      return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
+    });
+  }
+
+  // 自动识别 UTF-8 / GB18030
+  function decodeBuffer(buf) {
+    try {
+      return new TextDecoder("utf-8", { fatal: true }).decode(buf);
+    } catch (e) {
+      try {
+        return new TextDecoder("gb18030").decode(buf);
+      } catch (e2) {
+        return new TextDecoder("utf-8").decode(buf);
+      }
+    }
+  }
+
+  /* ---------------- 分段 ---------------- */
+  function splitParagraphs(text, mode) {
+    const lines = text.replace(/\r\n?/g, "\n").split("\n");
+    const paras = [];
+    if (mode === "line") {
+      for (const line of lines) {
+        const t = line.trim();
+        if (t) paras.push(t);
+      }
+    } else {
+      let buf = [];
+      for (const line of lines) {
+        const t = line.trim();
+        if (t) {
+          buf.push(t);
+        } else if (buf.length) {
+          paras.push(buf.join(" "));
+          buf = [];
+        }
+      }
+      if (buf.length) paras.push(buf.join(" "));
+    }
+    return paras;
+  }
+
+  /* ---------------- 章节划分 ---------------- */
+  const HEADING_RE = /^(第[0-9一二三四五六七八九十百千万零两]+[章节回卷篇集]|序章|序言|楔子|前言|引子|后记|尾声|番外|chapter\s+[0-9ivxlcdm]+|prologue|epilogue)/i;
+
+  function looksLikeHeading(p) {
+    return p.length <= 60 && HEADING_RE.test(p);
+  }
+
+  function buildChapters(paras, bookTitle) {
+    const headingIdx = [];
+    paras.forEach((p, i) => { if (looksLikeHeading(p)) headingIdx.push(i); });
+
+    // 情况一：原文里有明显的章节标题（至少 3 个，且不超过段落数一半）
+    if (headingIdx.length >= 3 && headingIdx.length < paras.length * 0.5) {
+      const starts = headingIdx.slice();
+      if (starts[0] > 0) starts.unshift(0); // 第一个标题之前的内容作为"前言"
+
+      const chapters = [];
+      for (let k = 0; k < starts.length; k++) {
+        const s = starts[k];
+        const e = k + 1 < starts.length ? starts[k + 1] : paras.length;
+        const isHeading = looksLikeHeading(paras[s]);
+        const title = isHeading ? paras[s] : "前言";
+        const body = isHeading ? paras.slice(s + 1, e) : paras.slice(s, e);
+        chapters.push({ title, navTitle: title, body });
+      }
+      return chapters;
+    }
+
+    // 情况二：没有章节标题，按字数切分
+    const groups = [];
+    let cur = [], len = 0;
+    for (const p of paras) {
+      cur.push(p);
+      len += p.length;
+      if (len >= MAX_CHARS) { groups.push(cur); cur = []; len = 0; }
+    }
+    if (cur.length) groups.push(cur);
+
+    const multi = groups.length > 1;
+    return groups.map((body, i) => ({
+      title: null,
+      navTitle: multi ? "第 " + (i + 1) + " 部分" : (bookTitle || "正文"),
+      body
+    }));
+  }
+
+  /* ---------------- EPUB 各部件 ---------------- */
+  const CONTAINER_XML = '<?xml version="1.0" encoding="UTF-8"?>\n' +
+    '<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">\n' +
+    '  <rootfiles>\n' +
+    '    <rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/>\n' +
+    '  </rootfiles>\n' +
+    '</container>';
+
+  const STYLE_CSS =
+    'body { margin: 0 5%; line-height: 1.7; }\n' +
+    'p { margin: 0.6em 0; text-indent: 2em; }\n' +
+    'h1 { text-align: center; font-size: 1.4em; margin: 1.2em 0 1.5em; }\n';
+
+  function chapterXhtml(title, navTitle, bodyParas) {
+    const h = title ? "<h1>" + esc(title) + "</h1>\n" : "";
+    const ps = bodyParas.map((p) => "<p>" + esc(p) + "</p>").join("\n");
+    return '<?xml version="1.0" encoding="UTF-8"?>\n' +
+      '<!DOCTYPE html>\n' +
+      '<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="zh">\n' +
+      '<head>\n' +
+      '<meta charset="UTF-8"/>\n' +
+      '<title>' + esc(navTitle) + '</title>\n' +
+      '<link rel="stylesheet" type="text/css" href="style.css"/>\n' +
+      '</head>\n' +
+      '<body>\n' + h + ps + '\n</body>\n</html>';
+  }
+
+  function navXhtml(chapters) {
+    const lis = chapters.map((ch, i) =>
+      '<li><a href="chap' + (i + 1) + '.xhtml">' + esc(ch.navTitle) + '</a></li>'
+    ).join("\n");
+    return '<?xml version="1.0" encoding="UTF-8"?>\n' +
+      '<!DOCTYPE html>\n' +
+      '<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="zh">\n' +
+      '<head>\n<meta charset="UTF-8"/>\n<title>目录</title>\n</head>\n' +
+      '<body>\n' +
+      '<nav epub:type="toc" id="toc">\n<h1>目录</h1>\n<ol>\n' + lis + '\n</ol>\n</nav>\n' +
+      '</body>\n</html>';
+  }
+
+  function ncxXml(bookTitle, uuid, chapters) {
+    const points = chapters.map((ch, i) =>
+      '<navPoint id="np' + (i + 1) + '" playOrder="' + (i + 1) + '">' +
+      '<navLabel><text>' + esc(ch.navTitle) + '</text></navLabel>' +
+      '<content src="chap' + (i + 1) + '.xhtml"/>' +
+      '</navPoint>'
+    ).join("\n");
+    return '<?xml version="1.0" encoding="UTF-8"?>\n' +
+      '<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1">\n' +
+      '<head>\n' +
+      '<meta name="dtb:uid" content="' + esc(uuid) + '"/>\n' +
+      '<meta name="dtb:depth" content="1"/>\n' +
+      '<meta name="dtb:totalPageCount" content="0"/>\n' +
+      '<meta name="dtb:maxPageNumber" content="0"/>\n' +
+      '</head>\n' +
+      '<docTitle><text>' + esc(bookTitle) + '</text></docTitle>\n' +
+      '<navMap>\n' + points + '\n</navMap>\n' +
+      '</ncx>';
+  }
+
+  function opfXml(bookTitle, author, uuid, modified, chapters) {
+    const items = chapters.map((ch, i) =>
+      '<item id="chap' + (i + 1) + '" href="chap' + (i + 1) + '.xhtml" media-type="application/xhtml+xml"/>'
+    ).join("\n    ");
+    const spine = chapters.map((ch, i) =>
+      '<itemref idref="chap' + (i + 1) + '"/>'
+    ).join("\n    ");
+
+    return '<?xml version="1.0" encoding="UTF-8"?>\n' +
+      '<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="bookid" xml:lang="zh">\n' +
+      '  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">\n' +
+      '    <dc:identifier id="bookid">' + esc(uuid) + '</dc:identifier>\n' +
+      '    <dc:title>' + esc(bookTitle) + '</dc:title>\n' +
+      '    <dc:language>zh</dc:language>\n' +
+      '    <dc:creator>' + esc(author) + '</dc:creator>\n' +
+      '    <meta property="dcterms:modified">' + modified + '</meta>\n' +
+      '  </metadata>\n' +
+      '  <manifest>\n' +
+      '    <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>\n' +
+      '    <item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>\n' +
+      '    <item id="css" href="style.css" media-type="text/css"/>\n' +
+      '    ' + items + '\n' +
+      '  </manifest>\n' +
+      '  <spine toc="ncx">\n' +
+      '    ' + spine + '\n' +
+      '  </spine>\n' +
+      '</package>';
+  }
+
+  /* ---------------- 主流程 ---------------- */
+  $("go").addEventListener("click", async () => {
+    if (!currentFile) return;
+
+    const btn = $("go");
+    const dl = $("download");
+    btn.disabled = true;
+    dl.style.display = "none";
+    if (dl.href) { URL.revokeObjectURL(dl.href); dl.removeAttribute("href"); }
+
+    try {
+      setStatus("读取文件…");
+      const buf = await currentFile.arrayBuffer();
+      const text = decodeBuffer(buf).replace(/^\uFEFF/, "");
+
+      if (!text.trim()) throw new Error("文件内容为空");
+
+      const mode = $("paraMode").value;
+      const bookTitle = ($("title").value.trim() || currentFile.name.replace(/\.txt$/i, "")).trim();
+      const author = $("author").value.trim() || "佚名";
+
+      const paras = splitParagraphs(text, mode);
+      if (!paras.length) throw new Error("没有解析到任何内容");
+
+      setStatus("划分章节…");
+      const chapters = buildChapters(paras, bookTitle);
+
+      const uuid = makeUuid();
+      const modified = new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
+
+      setStatus("生成 EPUB 结构…");
+      const zip = new JSZip();
+
+      // mimetype 必须是第一个文件，且不压缩
+      zip.file("mimetype", "application/epub+zip", { compression: "STORE" });
+      zip.file("META-INF/container.xml", CONTAINER_XML);
+
+      const oebps = zip.folder("OEBPS");
+      oebps.file("content.opf", opfXml(bookTitle, author, uuid, modified, chapters));
+      oebps.file("nav.xhtml", navXhtml(chapters));
+      oebps.file("toc.ncx", ncxXml(bookTitle, uuid, chapters));
+      oebps.file("style.css", STYLE_CSS);
+
+      chapters.forEach((ch, i) => {
+        oebps.file("chap" + (i + 1) + ".xhtml", chapterXhtml(ch.title, ch.navTitle, ch.body));
+      });
+
+      setStatus("打包中…");
+      const blob = await zip.generateAsync(
+        {
+          type: "blob",
+          mimeType: "application/epub+zip",
+          compression: "DEFLATE",
+          compressionOptions: { level: 6 }
+        },
+        (meta) => {
+          setStatus("打包中… " + Math.round(meta.percent) + "%");
+        }
+      );
+
+      const url = URL.createObjectURL(blob);
+      const safeName = bookTitle.replace(/[\\/:*?"<>|]/g, "_").slice(0, 80) || "book";
+      dl.href = url;
+      dl.download = safeName + ".epub";
+      dl.textContent = "下载 EPUB（" + safeName + ".epub）";
+      dl.style.display = "block";
+
+      setStatus("完成：共 " + chapters.length + " 个章节，文件大小约 " +
+        (blob.size / 1024 / 1024).toFixed(2) + " MB");
+    } catch (err) {
+      console.error(err);
+      setStatus("出错了：" + (err && err.message ? err.message : err));
+    } finally {
+      btn.disabled = false;
+    }
+  });
+})();
+</script>
+</body>
+</html>
